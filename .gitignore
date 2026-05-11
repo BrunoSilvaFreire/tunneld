@@ -1,0 +1,19 @@
+# Binaries
+tunneld
+tunnelctl
+
+# Packages
+*.deb
+*.zip
+pkg-build/
+
+# Workspaces
+go.work
+go.work.sum
+
+# IDEs
+.idea/
+.vscode/
+
+# System
+.DS_Store
