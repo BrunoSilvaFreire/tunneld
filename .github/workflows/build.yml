@@ -22,15 +22,21 @@ jobs:
 
       - name: Install dependencies
         run: go mod download
+        env:
+          GONOSUMDB: github.com/BrunoSilvaFreire
 
       - name: Run tests
         run: make test
+        env:
+          GONOSUMDB: github.com/BrunoSilvaFreire
 
       - name: Build packages
         run: |
           sudo apt-get update
           sudo apt-get install -y dpkg-dev zip
           make package-deb package-zip
+        env:
+          GONOSUMDB: github.com/BrunoSilvaFreire
 
       - name: Upload Debian Package
         uses: actions/upload-artifact@v4
