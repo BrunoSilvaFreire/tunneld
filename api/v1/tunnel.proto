@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package tunnel.v1;
+
+import "spec.proto";
+
+option go_package = "tunneld/pkg/api/v1;tunnelv1";
+
+service TunnelService {
+  rpc Status(StatusRequest) returns (StatusResponse);
+  rpc Start(StartRequest) returns (StartResponse);
+  rpc Stop(StopRequest) returns (StopResponse);
+  rpc Wait(WaitRequest) returns (WaitResponse);
+  rpc Create(CreateRequest) returns (CreateResponse);
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+}
+
+message TunnelStatus {
+  string name = 1;
+  string status = 2;
+  TunnelSpec spec = 3;
+}
+
+message StatusRequest {
+  string name = 1; // Optional: if empty, return all
+}
+
+message StatusResponse {
+  repeated TunnelStatus tunnels = 1;
+}
+
+message StartRequest {
+  string name = 1;
+}
+
+message StartResponse {}
+
+message StopRequest {
+  string name = 1;
+}
+
+message StopResponse {}
+
+message WaitRequest {
+  string name = 1;
+  int64 timeout_seconds = 2;
+}
+
+message WaitResponse {
+  string status = 1;
+}
+
+message CreateRequest {
+  TunnelSpec spec = 1;
+}
+
+message CreateResponse {}
+
+message DeleteRequest {
+  string name = 1;
+}
+
+message DeleteResponse {}

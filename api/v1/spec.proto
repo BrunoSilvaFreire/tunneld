@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package tunnel.v1;
+
+import "google/protobuf/duration.proto";
+
+option go_package = "tunneld/pkg/api/v1;tunnelv1";
+
+message TunnelSpec {
+  string name = 1;
+  repeated string depends_on = 2;
+  oneof type {
+    SSHSpec ssh = 3;
+    KubectlSpec kubectl = 4;
+  }
+  HealthCheckSpec health = 5;
+  RestartPolicySpec restart = 6;
+  google.protobuf.Duration startup_timeout = 7;
+  google.protobuf.Duration shutdown_timeout = 8;
+}
+
+message SSHSpec {
+  string user = 1;
+  string host = 2;
+  int32 port = 3;
+  string identity_file = 4;
+  repeated SSHForward local_forwards = 5;
+  map<string, string> options = 6;
+}
+
+message SSHForward {
+  string listen_address = 1;
+  int32 listen_port = 2;
+  string target_host = 3;
+  int32 target_port = 4;
+}
+
+message KubectlSpec {
+  string kubeconfig = 1;
+  string context = 2;
+  string namespace = 3;
+  string resource = 4;
+  repeated KubectlForward forwards = 5;
+  string api_server = 6;
+  bool insecure_skip_tls_verify = 7;
+}
+
+message KubectlForward {
+  string local_address = 1;
+  int32 local_port = 2;
+  int32 remote_port = 3;
+}
+
+message HealthCheckSpec {
+  string type = 1;
+  string address = 2;
+  google.protobuf.Duration interval = 3;
+  google.protobuf.Duration timeout = 4;
+  google.protobuf.Duration startup_timeout = 5;
+}
+
+message RestartPolicySpec {
+  string policy = 1; // always, on-failure, never
+  google.protobuf.Duration delay = 2;
+  int32 max_attempts = 3;
+}
