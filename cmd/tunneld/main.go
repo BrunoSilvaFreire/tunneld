@@ -90,15 +90,19 @@ func plan(path string) {
 }
 
 func run(path, socketPath string) {
-	cfg, err := config.Load(path)
-	if err != nil {
-		log.Fatalf("Error loading config: %v", err)
-	}
+        cfg, err := config.Load(path)
+        if err != nil {
+                if os.IsNotExist(err) {
+                        log.Printf("Config file %s not found, starting with no tunnels", path)
+                        cfg = &config.Config{Tunnels: make(map[string]config.TunnelConfig)}
+                } else {
+                        log.Fatalf("Error loading config: %v", err)
+                }
+        }
 
-	if err := cfg.Validate(); err != nil {
-		log.Fatalf("Validation failed: %v", err)
-	}
-
+        if err := cfg.Validate(); err != nil {
+                log.Fatalf("Validation failed: %v", err)
+        }
 	specs, _ := cfg.ToSpecs()
 	planner := dependency.NewPlanner(specs)
 	supervisor := daemon.NewSupervisor(planner)

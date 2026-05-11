@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+
 	"github.com/BrunoSilvaFreire/tunneld/internal/config"
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
 
@@ -25,7 +26,7 @@ func main() {
 	}
 
 	// Connect to gRPC server over Unix Domain Socket
-	conn, err := grpc.Dial("unix://"+*socketPath, 
+	conn, err := grpc.Dial("unix://"+*socketPath,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 			return net.Dial("unix", *socketPath)
@@ -48,6 +49,8 @@ func main() {
 		wait(client, flag.Args()[1:])
 	case "create":
 		create(client, flag.Args()[1:])
+	case "load":
+		load(client, flag.Args()[1:])
 	case "delete":
 		deleteTunnel(client, flag.Args()[1:])
 	default:
@@ -67,6 +70,7 @@ func usage() {
 	fmt.Println("  stop <name>         Stop a tunnel")
 	fmt.Println("  wait <name>         Wait for a tunnel to be healthy")
 	fmt.Println("  create <name>       Create a tunnel from YAML config")
+	fmt.Println("  load <path>         Load all tunnels from a YAML config file")
 	fmt.Println("  delete <name>       Delete a tunnel")
 }
 
@@ -121,11 +125,11 @@ func wait(client pb.TunnelServiceClient, args []string) {
 	if len(args) == 0 {
 		log.Fatal("tunnel name required")
 	}
-	
+
 	waitCmd := flag.NewFlagSet("wait", flag.ExitOnError)
 	timeoutPtr := waitCmd.Int("timeout", 30, "Timeout in seconds")
 	_ = waitCmd.Parse(args[1:])
-	
+
 	fmt.Printf("Waiting for tunnel %q (timeout %ds)...\n", args[0], *timeoutPtr)
 	resp, err := client.Wait(context.Background(), &pb.WaitRequest{
 		Name:           args[0],
@@ -172,6 +176,40 @@ func create(client pb.TunnelServiceClient, args []string) {
 		log.Fatalf("could not create: %v", err)
 	}
 	fmt.Printf("Tunnel %q created\n", name)
+}
+
+func load(client pb.TunnelServiceClient, args []string) {
+	if len(args) == 0 {
+		log.Fatal("config file path required")
+	}
+	configPath := args[0]
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
+
+	specs, err := cfg.ToSpecs()
+	if err != nil {
+		log.Fatalf("failed to parse specs: %v", err)
+	}
+
+	for name, spec := range specs {
+		_, err := client.Create(context.Background(), &pb.CreateRequest{
+			Spec: spec.ToProto(),
+		})
+		if err != nil {
+			fmt.Printf("Failed to create tunnel %q: %v\n", name, err)
+			continue
+		}
+
+		_, err = client.Start(context.Background(), &pb.StartRequest{Name: name})
+		if err != nil {
+			fmt.Printf("Failed to start tunnel %q: %v\n", name, err)
+			continue
+		}
+		fmt.Printf("Tunnel %q loaded and started\n", name)
+	}
 }
 
 func deleteTunnel(client pb.TunnelServiceClient, args []string) {

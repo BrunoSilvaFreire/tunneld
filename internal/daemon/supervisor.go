@@ -219,22 +219,7 @@ func (s *Supervisor) startAndNotify(ctx context.Context, p *Process) error {
 		}
 	}()
 
-	// Block until healthy or timeout for initial startup
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-			if p.Status() == tunnel.StatusRunning {
-				return nil
-			}
-			if time.Since(start) > timeout {
-				return fmt.Errorf("timeout waiting for health")
-			}
-		}
-	}
+	return nil
 }
 
 func (s *Supervisor) handleFailure(ctx context.Context, name string) {
