@@ -1,4 +1,12 @@
- make package-deb || exit 1
- sudo apt purge tunneld && sudo apt install ./tunneld_0.1.0_amd64.deb || exit 2
- sudo systemctl daemon-reload  || exit 3
- sudo systemctl restart tunneld.service  || exit 4
+#!/bin/bash
+set -e
+
+ARCH=$(go env GOARCH)
+VERSION=$(git describe --tags --always --dirty | sed 's/^v//')
+PACKAGE="tunneld_${VERSION}_${ARCH}.deb"
+
+make package-deb GOARCH=$ARCH VERSION=$VERSION || exit 1
+sudo apt purge tunneld -y || true
+sudo apt install "./${PACKAGE}" -y || exit 2
+sudo systemctl daemon-reload || exit 3
+sudo systemctl restart tunneld.service || exit 4

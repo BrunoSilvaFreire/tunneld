@@ -15,6 +15,9 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
     permissions:
       contents: write
       packages: write
@@ -31,21 +34,22 @@ jobs:
           go-version: '1.26'
           cache: true
 
-      - name: Build packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y dpkg-dev zip
-          make package-deb package-zip
-        env:
-          GONOSUMDB: github.com/BrunoSilvaFreire
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Build packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev zip
+          make package-deb package-zip GOARCH=${{ matrix.arch }}
+        env:
+          GONOSUMDB: github.com/BrunoSilvaFreire
+
       - name: Log in to GHCR
+        if: matrix.arch == 'amd64'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -63,8 +67,12 @@ jobs:
             TAG_NAME=$(git describe --tags --abbrev=0 || echo "latest")
           fi
           echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "owner_lc=$OWNER_LC" >> $GITHUB_OUTPUT
 
       - name: Build and push tunneld
+        if: matrix.arch == 'amd64'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -72,10 +80,11 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/tunneld:${{ steps.meta.outputs.tag }}
-            ghcr.io/${{ github.repository_owner }}/tunneld:latest
+            ghcr.io/${{ steps.meta.outputs.owner_lc }}/tunneld:${{ steps.meta.outputs.tag }}
+            ghcr.io/${{ steps.meta.outputs.owner_lc }}/tunneld:latest
 
       - name: Build and push tunnelctl
+        if: matrix.arch == 'amd64'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -83,16 +92,54 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/tunnelctl:${{ steps.meta.outputs.tag }}
-            ghcr.io/${{ github.repository_owner }}/tunnelctl:latest
+            ghcr.io/${{ steps.meta.outputs.owner_lc }}/tunnelctl:${{ steps.meta.outputs.tag }}
+            ghcr.io/${{ steps.meta.outputs.owner_lc }}/tunnelctl:latest
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts-${{ matrix.arch }}
+          path: |
+            *.deb
+            *.zip
+
+  publish:
+    name: Publish Release
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: release-artifacts-*
+          merge-multiple: true
+
+      - name: Extract metadata
+        id: meta
+        run: |
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            TAG_NAME="${{ github.event.inputs.tag_name }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${{ github.ref_name }}"
+          else
+            TAG_NAME=$(git describe --tags --abbrev=0 || echo "latest")
+          fi
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
-          files: |
-            *.deb
-            *.zip
+          files: artifacts/*
           draft: false
           prerelease: false
           generate_release_notes: true

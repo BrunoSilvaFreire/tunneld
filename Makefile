@@ -2,9 +2,10 @@
 
 BINARY_TUNNELD=tunneld
 BINARY_TUNNELCTL=tunnelctl
-VERSION=0.1.0
-DEB_PACKAGE=$(BINARY_TUNNELD)_$(VERSION)_amd64.deb
-ZIP_PACKAGE=$(BINARY_TUNNELD)_$(VERSION)_linux_amd64.zip
+VERSION ?= $(shell git describe --tags --always --dirty | sed 's/^v//')
+GOARCH ?= $(shell go env GOARCH)
+DEB_PACKAGE=$(BINARY_TUNNELD)_$(VERSION)_$(GOARCH).deb
+ZIP_PACKAGE=$(BINARY_TUNNELD)_$(VERSION)_linux_$(GOARCH).zip
 
 all: build
 
@@ -17,8 +18,8 @@ setup-remote:
 	go mod tidy
 
 build:
-	go build -o $(BINARY_TUNNELD) ./cmd/tunneld/main.go
-	go build -o $(BINARY_TUNNELCTL) ./cmd/tunnelctl/main.go
+	GOARCH=$(GOARCH) go build -o $(BINARY_TUNNELD) ./cmd/tunneld/main.go
+	GOARCH=$(GOARCH) go build -o $(BINARY_TUNNELCTL) ./cmd/tunnelctl/main.go
 
 test:
 	go test ./...
@@ -58,7 +59,7 @@ package-deb: build
 	echo "Version: $(VERSION)" >> pkg-build/DEBIAN/control
 	echo "Section: base" >> pkg-build/DEBIAN/control
 	echo "Priority: optional" >> pkg-build/DEBIAN/control
-	echo "Architecture: amd64" >> pkg-build/DEBIAN/control
+	echo "Architecture: $(GOARCH)" >> pkg-build/DEBIAN/control
 	echo "Maintainer: tunneld team" >> pkg-build/DEBIAN/control
 	echo "Description: Persistent local tunnel supervisor daemon" >> pkg-build/DEBIAN/control
 	
