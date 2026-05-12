@@ -1,0 +1,14 @@
+namespace: tunneld
+name: tunneld
+version: 1.0.0
+readme: README.md
+authors:
+  - Gemini CLI
+description: Ansible collection for managing tunneld tunnels via tunnelctl
+license:
+  - MIT
+tags:
+  - networking
+  - tunnel
+  - infrastructure
+dependencies: {}

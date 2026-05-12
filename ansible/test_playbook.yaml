@@ -1,0 +1,79 @@
+---
+- name: Test tunneld Ansible Modules
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    # Adjust this if tunnelctl is not in your PATH
+    tunnelctl_path: "{{ lookup('env', 'PWD') }}/tunnelctl"
+    tunnel_name: "test-ansible-tunnel"
+
+  tasks:
+    - name: Ensure tunneld_tunnel is present (idempotent creation)
+      tunneld_tunnel:
+        name: "{{ tunnel_name }}"
+        state: present
+        bin_path: "{{ tunnelctl_path }}"
+        definition:
+          enabled: true
+          type: ssh
+          ssh:
+            user: "testuser"
+            host: "localhost"
+            port: 2222
+            local_forwards:
+              - listen_port: 9000
+                target_host: "localhost"
+                target_port: 80
+          health:
+            type: tcp
+            address: "localhost:9000"
+            interval: 5s
+      register: tunnel_present
+
+    - name: Assert tunnel was created
+      assert:
+        that:
+          - tunnel_present.changed == true
+
+    - name: Ensure tunneld_tunnel is started
+      tunneld_tunnel:
+        name: "{{ tunnel_name }}"
+        state: started
+        bin_path: "{{ tunnelctl_path }}"
+      register: tunnel_started
+
+    - name: Gather facts about tunnels
+      tunneld_info:
+        name: "{{ tunnel_name }}"
+        bin_path: "{{ tunnelctl_path }}"
+      register: tunnel_info
+
+    - name: Assert tunnel is running
+      assert:
+        that:
+          - tunnel_info.tunnels[0].status == 'running'
+
+    - name: Ensure tunneld_tunnel is stopped
+      tunneld_tunnel:
+        name: "{{ tunnel_name }}"
+        state: stopped
+        bin_path: "{{ tunnelctl_path }}"
+      register: tunnel_stopped
+
+    - name: Assert tunnel was stopped
+      assert:
+        that:
+          - tunnel_stopped.changed == true
+
+    - name: Ensure tunneld_tunnel is absent
+      tunneld_tunnel:
+        name: "{{ tunnel_name }}"
+        state: absent
+        bin_path: "{{ tunnelctl_path }}"
+      register: tunnel_absent
+
+    - name: Assert tunnel was deleted
+      assert:
+        that:
+          - tunnel_absent.changed == true
