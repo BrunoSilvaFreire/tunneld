@@ -2,7 +2,7 @@
 
 BINARY_TUNNELD=tunneld
 BINARY_TUNNELCTL=tunnelctl
-VERSION ?= $(shell git describe --tags --always --dirty | sed 's/^v//')
+VERSION ?= $(shell scripts/get_version.sh)
 GOARCH ?= $(shell go env GOARCH)
 DEB_PACKAGE=$(BINARY_TUNNELD)_$(VERSION)_$(GOARCH).deb
 ZIP_PACKAGE=$(BINARY_TUNNELD)_$(VERSION)_linux_$(GOARCH).zip

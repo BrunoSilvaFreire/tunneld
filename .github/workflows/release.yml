@@ -12,15 +12,13 @@ on:
         type: string
 
 jobs:
-  release:
-    name: Create Release
+  metadata:
+    name: Prepare Metadata
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64, arm64]
-    permissions:
-      contents: write
-      packages: write
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+      owner_lc: ${{ steps.parse.outputs.owner_lc }}
+      tag: ${{ steps.parse.outputs.tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -28,72 +26,53 @@ jobs:
           fetch-tags: true
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.26'
-          cache: true
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y dpkg-dev zip
-          make package-deb package-zip GOARCH=${{ matrix.arch }}
-        env:
-          GONOSUMDB: github.com/BrunoSilvaFreire
-
-      - name: Log in to GHCR
-        if: matrix.arch == 'amd64'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
+      - name: Parse Version and Metadata
+        id: parse
         run: |
           if [ -n "${{ github.event.inputs.tag_name }}" ]; then
             TAG_NAME="${{ github.event.inputs.tag_name }}"
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${{ github.ref_name }}"
           else
-            TAG_NAME=$(git describe --tags --abbrev=0 || echo "latest")
+            TAG_NAME=$(git describe --tags --abbrev=0 || echo "v0.0.0-dev")
           fi
-          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
           
+          # Strip 'v' prefix for VERSION
+          VERSION=$(echo "$TAG_NAME" | sed 's/^v//')
           OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "owner_lc=$OWNER_LC" >> $GITHUB_OUTPUT
 
-      - name: Build and push tunneld
-        if: matrix.arch == 'amd64'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: containers/Containerfile.tunneld
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ghcr.io/${{ steps.meta.outputs.owner_lc }}/tunneld:${{ steps.meta.outputs.tag }}
-            ghcr.io/${{ steps.meta.outputs.owner_lc }}/tunneld:latest
+  build-artifacts:
+    name: Build Artifacts (${{ matrix.arch }})
+    needs: metadata
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Build and push tunnelctl
-        if: matrix.arch == 'amd64'
-        uses: docker/build-push-action@v6
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          context: .
-          file: containers/Containerfile.tunnelctl
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ghcr.io/${{ steps.meta.outputs.owner_lc }}/tunnelctl:${{ steps.meta.outputs.tag }}
-            ghcr.io/${{ steps.meta.outputs.owner_lc }}/tunnelctl:latest
+          go-version: '1.26'
+          cache: true
+
+      - name: Build packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev zip
+          make package-deb package-zip GOARCH=${{ matrix.arch }} VERSION=${{ needs.metadata.outputs.version }}
+        env:
+          GONOSUMDB: github.com/BrunoSilvaFreire
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -103,18 +82,94 @@ jobs:
             *.deb
             *.zip
 
+  build-docker:
+    name: Build Docker Images (${{ matrix.arch }})
+    needs: metadata
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    permissions:
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push tunneld
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: containers/Containerfile.tunneld
+          platforms: linux/${{ matrix.arch }}
+          push: true
+          tags: |
+            ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld:${{ needs.metadata.outputs.tag }}-${{ matrix.arch }}
+            ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld:latest-${{ matrix.arch }}
+
+      - name: Build and push tunnelctl
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: containers/Containerfile.tunnelctl
+          platforms: linux/${{ matrix.arch }}
+          push: true
+          tags: |
+            ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunnelctl:${{ needs.metadata.outputs.tag }}-${{ matrix.arch }}
+            ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunnelctl:latest-${{ matrix.arch }}
+
+  manifest:
+    name: Create Multi-Arch Manifests
+    needs: [metadata, build-docker]
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push tunneld manifest
+        run: |
+          docker buildx imagetools create \
+            -t ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld:${{ needs.metadata.outputs.tag }} \
+            -t ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld:latest \
+            ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld:${{ needs.metadata.outputs.tag }}-amd64 \
+            ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld:${{ needs.metadata.outputs.tag }}-arm64
+
+      - name: Create and push tunnelctl manifest
+        run: |
+          docker buildx imagetools create \
+            -t ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunnelctl:${{ needs.metadata.outputs.tag }} \
+            -t ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunnelctl:latest \
+            ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunnelctl:${{ needs.metadata.outputs.tag }}-amd64 \
+            ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunnelctl:${{ needs.metadata.outputs.tag }}-arm64
+
   publish:
     name: Publish Release
-    needs: release
+    needs: [metadata, build-artifacts, manifest]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-tags: true
-          fetch-depth: 0
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -123,22 +178,10 @@ jobs:
           pattern: release-artifacts-*
           merge-multiple: true
 
-      - name: Extract metadata
-        id: meta
-        run: |
-          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
-            TAG_NAME="${{ github.event.inputs.tag_name }}"
-          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            TAG_NAME="${{ github.ref_name }}"
-          else
-            TAG_NAME=$(git describe --tags --abbrev=0 || echo "latest")
-          fi
-          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.meta.outputs.tag }}
+          tag_name: ${{ needs.metadata.outputs.tag }}
           files: artifacts/*
           draft: false
           prerelease: false

@@ -2,7 +2,7 @@
 set -e
 
 ARCH=$(go env GOARCH)
-VERSION=$(git describe --tags --always --dirty | sed 's/^v//')
+VERSION=$(scripts/get_version.sh)
 PACKAGE="tunneld_${VERSION}_${ARCH}.deb"
 
 make package-deb GOARCH=$ARCH VERSION=$VERSION || exit 1
