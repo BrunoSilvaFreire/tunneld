@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/BrunoSilvaFreire/tunneld/internal/config"
+	"github.com/BrunoSilvaFreire/tunneld/internal/dependency"
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
 	"github.com/spf13/cobra"
 )
@@ -30,8 +31,14 @@ var loadCmd = &cobra.Command{
 			log.Fatalf("failed to parse specs: %v", err)
 		}
 
+		order, err := dependency.NewPlanner(specs).Plan()
+		if err != nil {
+			log.Fatalf("failed to resolve dependency order: %v", err)
+		}
+
 		hasError := false
-		for name, spec := range specs {
+		for _, spec := range order {
+			name := spec.Name()
 			protoSpec := spec.ToProto()
 			inlineKeys, err := slurpKeys(protoSpec)
 			if err != nil {
