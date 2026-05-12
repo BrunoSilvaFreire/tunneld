@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/BrunoSilvaFreire/tunneld/internal/config"
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
@@ -29,21 +30,37 @@ var loadCmd = &cobra.Command{
 			log.Fatalf("failed to parse specs: %v", err)
 		}
 
+		hasError := false
 		for name, spec := range specs {
-			_, err := client.Create(context.Background(), &pb.CreateRequest{
-				Spec: spec.ToProto(),
+			protoSpec := spec.ToProto()
+			inlineKeys, err := slurpKeys(protoSpec)
+			if err != nil {
+				log.Printf("Failed to slurp keys for tunnel %q: %v", name, err)
+				hasError = true
+				continue
+			}
+
+			_, err = client.Create(context.Background(), &pb.CreateRequest{
+				Spec:       protoSpec,
+				InlineKeys: inlineKeys,
 			})
 			if err != nil {
-				fmt.Printf("Failed to create tunnel %q: %v\n", name, err)
+				log.Printf("Failed to create tunnel %q: %v", name, err)
+				hasError = true
 				continue
 			}
 
 			_, err = client.Start(context.Background(), &pb.StartRequest{Name: name})
 			if err != nil {
-				fmt.Printf("Failed to start tunnel %q: %v\n", name, err)
+				log.Printf("Failed to start tunnel %q: %v", name, err)
+				hasError = true
 				continue
 			}
 			fmt.Printf("Tunnel %q loaded and started\n", name)
+		}
+
+		if hasError {
+			os.Exit(1)
 		}
 	},
 }

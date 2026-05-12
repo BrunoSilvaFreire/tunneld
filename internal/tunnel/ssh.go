@@ -3,7 +3,9 @@ package tunnel
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
 
@@ -21,7 +23,7 @@ type SSHForward struct {
 	TargetPort    int
 }
 
-func NewSSHSpec(name string, dependsOn []string, user, host string, port int, identityFile string, forwards []SSHForward, options map[string]string, health *pb.HealthCheckSpec, restart *pb.RestartPolicySpec, startup, shutdown time.Duration) *SSHSpec {
+func NewSSHSpec(name string, dependsOn []string, user, host string, port int, identityKey string, forwards []SSHForward, options map[string]string, health *pb.HealthCheckSpec, restart *pb.RestartPolicySpec, startup, shutdown time.Duration) *SSHSpec {
 	pbForwards := make([]*pb.SSHForward, len(forwards))
 	for i, f := range forwards {
 		pbForwards[i] = &pb.SSHForward{
@@ -45,7 +47,7 @@ func NewSSHSpec(name string, dependsOn []string, user, host string, port int, id
 					User:          user,
 					Host:          host,
 					Port:          int32(port),
-					IdentityFile:  identityFile,
+					IdentityKey:   identityKey,
 					LocalForwards: pbForwards,
 					Options:       options,
 				},
@@ -74,16 +76,43 @@ func (s *SSHSpec) StartupTimeout() time.Duration { return s.pbSpec.StartupTimeou
 func (s *SSHSpec) ShutdownTimeout() time.Duration { return s.pbSpec.ShutdownTimeout.AsDuration() }
 func (s *SSHSpec) ToProto() *pb.TunnelSpec { return s.pbSpec }
 
-func (s *SSHSpec) BuildCommand(ctx context.Context) (*exec.Cmd, error) {
+func (s *SSHSpec) BuildCommand(ctx context.Context, keyDir string) (*exec.Cmd, error) {
 	ssh := s.pbSpec.GetSsh()
-	args := []string{"-N"}
+	var identityPath string
+
+	if ssh.IdentityKey != "" {
+		identityPath = filepath.Join(keyDir, ssh.IdentityKey)
+		if _, err := os.Stat(identityPath); err != nil {
+			return nil, fmt.Errorf("identity key %q not found in %s: %v", ssh.IdentityKey, keyDir, err)
+		}
+		// Try to open it for reading to ensure permissions are correct for the current user
+		f, err := os.Open(identityPath)
+		if err != nil {
+			return nil, fmt.Errorf("identity key %q is not readable: %v", ssh.IdentityKey, err)
+		}
+		f.Close()
+	}
+
+	args := []string{"-N", "-o", "BatchMode=yes"}
+
+	// Add default StrictHostKeyChecking if not specified in options
+	hasStrictHostKeyChecking := false
+	for k := range ssh.Options {
+		if k == "StrictHostKeyChecking" {
+			hasStrictHostKeyChecking = true
+			break
+		}
+	}
+	if !hasStrictHostKeyChecking {
+		args = append(args, "-o", "StrictHostKeyChecking=accept-new")
+	}
 
 	if ssh.Port != 0 && ssh.Port != 22 {
 		args = append(args, "-p", fmt.Sprintf("%d", ssh.Port))
 	}
 
-	if ssh.IdentityFile != "" {
-		args = append(args, "-i", ssh.IdentityFile)
+	if identityPath != "" {
+		args = append(args, "-i", identityPath)
 	}
 
 	for k, v := range ssh.Options {

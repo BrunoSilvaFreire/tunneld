@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"time"
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
 
@@ -20,7 +21,7 @@ type KubectlForward struct {
 	RemotePort   int
 }
 
-func NewKubectlSpec(name string, dependsOn []string, kubeconfig, context, namespace, resource string, forwards []KubectlForward, apiServer string, skipTLS bool, health *pb.HealthCheckSpec, restart *pb.RestartPolicySpec, startup, shutdown time.Duration) *KubectlSpec {
+func NewKubectlSpec(name string, dependsOn []string, kubeconfigKey, context, namespace, resource string, forwards []KubectlForward, apiServer string, skipTLS bool, health *pb.HealthCheckSpec, restart *pb.RestartPolicySpec, startup, shutdown time.Duration) *KubectlSpec {
 	pbForwards := make([]*pb.KubectlForward, len(forwards))
 	for i, f := range forwards {
 		pbForwards[i] = &pb.KubectlForward{
@@ -40,7 +41,7 @@ func NewKubectlSpec(name string, dependsOn []string, kubeconfig, context, namesp
 			ShutdownTimeout: durationpb.New(shutdown),
 			Type: &pb.TunnelSpec_Kubectl{
 				Kubectl: &pb.KubectlSpec{
-					Kubeconfig:            kubeconfig,
+					KubeconfigKey:         kubeconfigKey,
 					Context:               context,
 					Namespace:             namespace,
 					Resource:              resource,
@@ -62,12 +63,13 @@ func (s *KubectlSpec) StartupTimeout() time.Duration { return s.pbSpec.StartupTi
 func (s *KubectlSpec) ShutdownTimeout() time.Duration { return s.pbSpec.ShutdownTimeout.AsDuration() }
 func (s *KubectlSpec) ToProto() *pb.TunnelSpec { return s.pbSpec }
 
-func (s *KubectlSpec) BuildCommand(ctx context.Context) (*exec.Cmd, error) {
+func (s *KubectlSpec) BuildCommand(ctx context.Context, keyDir string) (*exec.Cmd, error) {
 	k := s.pbSpec.GetKubectl()
 	args := []string{}
 
-	if k.Kubeconfig != "" {
-		args = append(args, "--kubeconfig", k.Kubeconfig)
+	if k.KubeconfigKey != "" {
+		kubeconfigPath := filepath.Join(keyDir, k.KubeconfigKey)
+		args = append(args, "--kubeconfig", kubeconfigPath)
 	}
 	if k.Context != "" {
 		args = append(args, "--context", k.Context)

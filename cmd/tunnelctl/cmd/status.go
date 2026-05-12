@@ -24,7 +24,7 @@ var statusCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("could not get status: %v", err)
 		}
-		fmt.Printf("%-20s %-10s %-10s %s\n", "NAME", "TYPE", "STATUS", "DEPENDENCIES")
+		fmt.Printf("%-20s %-10s %-10s %-20s %s\n", "NAME", "TYPE", "STATUS", "ERROR", "DEPENDENCIES")
 		for _, t := range resp.Tunnels {
 			typeStr := "unknown"
 			deps := []string{}
@@ -36,7 +36,7 @@ var statusCmd = &cobra.Command{
 					typeStr = "kubectl"
 				}
 			}
-			fmt.Printf("%-20s %-10s %-10s %v\n", t.Name, typeStr, t.Status, deps)
+			fmt.Printf("%-20s %-10s %-10s %-20s %v\n", t.Name, typeStr, t.Status, t.Error, deps)
 		}
 	},
 }

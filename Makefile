@@ -62,6 +62,21 @@ package-deb: build
 	echo "Maintainer: tunneld team" >> pkg-build/DEBIAN/control
 	echo "Description: Persistent local tunnel supervisor daemon" >> pkg-build/DEBIAN/control
 	
+	# Postinst script
+	echo "#!/bin/sh" > pkg-build/DEBIAN/postinst
+	echo "set -e" >> pkg-build/DEBIAN/postinst
+	echo "if ! getent group tunneld >/dev/null; then" >> pkg-build/DEBIAN/postinst
+	echo "    addgroup --system tunneld" >> pkg-build/DEBIAN/postinst
+	echo "fi" >> pkg-build/DEBIAN/postinst
+	echo "if ! getent passwd tunneld >/dev/null; then" >> pkg-build/DEBIAN/postinst
+	echo "    adduser --system --ingroup tunneld --no-create-home --home /etc/tunneld --disabled-password --disabled-login tunneld" >> pkg-build/DEBIAN/postinst
+	echo "fi" >> pkg-build/DEBIAN/postinst
+	echo "mkdir -p /var/lib/tunneld/keys" >> pkg-build/DEBIAN/postinst
+	echo "chown -R tunneld:tunneld /etc/tunneld" >> pkg-build/DEBIAN/postinst
+	echo "chown -R tunneld:tunneld /var/lib/tunneld" >> pkg-build/DEBIAN/postinst
+	echo "chmod 700 /var/lib/tunneld" >> pkg-build/DEBIAN/postinst
+	chmod 755 pkg-build/DEBIAN/postinst
+
 	dpkg-deb --build pkg-build $(DEB_PACKAGE)
 
 package-zip: build

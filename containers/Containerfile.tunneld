@@ -1,0 +1,41 @@
+# Build stage
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
+
+WORKDIR /app
+
+# Copy go mod and sum files
+COPY go.mod go.sum ./
+
+# Download all dependencies. Dependencies will be cached if the go.mod and go.sum files are not changed
+RUN go mod download
+
+# Copy the source from the current directory to the Working Directory inside the container
+COPY . .
+
+# Use Buildx TARGETARCH to cross-compile
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -o tunneld ./cmd/tunneld/main.go
+
+# Runtime stage
+FROM alpine:3.21
+
+# Accept TARGETARCH in this stage for the kubectl download
+ARG TARGETARCH
+
+# Install runtime dependencies: openssh-client and curl (to download kubectl)
+RUN apk add --no-cache openssh-client curl
+
+# Download and install kubectl for the specific target architecture
+RUN curl -LO "https://dl.k8s.io/release/v1.32.1/bin/linux/${TARGETARCH}/kubectl" && \
+    chmod +x kubectl && \
+    mv kubectl /usr/local/bin/
+
+# Copy the binary from the builder stage
+COPY --from=builder /app/tunneld /usr/local/bin/tunneld
+
+# Create directory for keys and configs
+RUN mkdir -p /etc/tunneld /var/lib/tunneld/keys && \
+    chmod 700 /var/lib/tunneld
+
+ENTRYPOINT ["/usr/local/bin/tunneld"]
+CMD ["run"]

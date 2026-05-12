@@ -6,7 +6,7 @@ tunnels:
       user: user
       host: bastion.example.com
       port: 22
-      identity_file: /home/me/.ssh/id_ed25519
+      identity_key: /home/me/.ssh/id_ed25519
       local_forwards:
         - listen_address: 127.0.0.1
           listen_port: 16443

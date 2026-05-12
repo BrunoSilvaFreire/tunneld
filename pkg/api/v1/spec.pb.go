@@ -157,7 +157,7 @@ type SSHSpec struct {
 	User          string                 `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
 	Host          string                 `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
 	Port          int32                  `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"`
-	IdentityFile  string                 `protobuf:"bytes,4,opt,name=identity_file,json=identityFile,proto3" json:"identity_file,omitempty"`
+	IdentityKey   string                 `protobuf:"bytes,4,opt,name=identity_key,json=identityKey,proto3" json:"identity_key,omitempty"`
 	LocalForwards []*SSHForward          `protobuf:"bytes,5,rep,name=local_forwards,json=localForwards,proto3" json:"local_forwards,omitempty"`
 	Options       map[string]string      `protobuf:"bytes,6,rep,name=options,proto3" json:"options,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
@@ -215,9 +215,9 @@ func (x *SSHSpec) GetPort() int32 {
 	return 0
 }
 
-func (x *SSHSpec) GetIdentityFile() string {
+func (x *SSHSpec) GetIdentityKey() string {
 	if x != nil {
-		return x.IdentityFile
+		return x.IdentityKey
 	}
 	return ""
 }
@@ -306,7 +306,7 @@ func (x *SSHForward) GetTargetPort() int32 {
 
 type KubectlSpec struct {
 	state                 protoimpl.MessageState `protogen:"open.v1"`
-	Kubeconfig            string                 `protobuf:"bytes,1,opt,name=kubeconfig,proto3" json:"kubeconfig,omitempty"`
+	KubeconfigKey         string                 `protobuf:"bytes,1,opt,name=kubeconfig_key,json=kubeconfigKey,proto3" json:"kubeconfig_key,omitempty"`
 	Context               string                 `protobuf:"bytes,2,opt,name=context,proto3" json:"context,omitempty"`
 	Namespace             string                 `protobuf:"bytes,3,opt,name=namespace,proto3" json:"namespace,omitempty"`
 	Resource              string                 `protobuf:"bytes,4,opt,name=resource,proto3" json:"resource,omitempty"`
@@ -347,9 +347,9 @@ func (*KubectlSpec) Descriptor() ([]byte, []int) {
 	return file_spec_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *KubectlSpec) GetKubeconfig() string {
+func (x *KubectlSpec) GetKubeconfigKey() string {
 	if x != nil {
-		return x.Kubeconfig
+		return x.KubeconfigKey
 	}
 	return ""
 }
@@ -609,12 +609,12 @@ const file_spec_proto_rawDesc = "" +
 	"\arestart\x18\x06 \x01(\v2\x1c.tunnel.v1.RestartPolicySpecR\arestart\x12B\n" +
 	"\x0fstartup_timeout\x18\a \x01(\v2\x19.google.protobuf.DurationR\x0estartupTimeout\x12D\n" +
 	"\x10shutdown_timeout\x18\b \x01(\v2\x19.google.protobuf.DurationR\x0fshutdownTimeoutB\x06\n" +
-	"\x04type\"\x9f\x02\n" +
+	"\x04type\"\x9d\x02\n" +
 	"\aSSHSpec\x12\x12\n" +
 	"\x04user\x18\x01 \x01(\tR\x04user\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x12\x12\n" +
-	"\x04port\x18\x03 \x01(\x05R\x04port\x12#\n" +
-	"\ridentity_file\x18\x04 \x01(\tR\fidentityFile\x12<\n" +
+	"\x04port\x18\x03 \x01(\x05R\x04port\x12!\n" +
+	"\fidentity_key\x18\x04 \x01(\tR\videntityKey\x12<\n" +
 	"\x0elocal_forwards\x18\x05 \x03(\v2\x15.tunnel.v1.SSHForwardR\rlocalForwards\x129\n" +
 	"\aoptions\x18\x06 \x03(\v2\x1f.tunnel.v1.SSHSpec.OptionsEntryR\aoptions\x1a:\n" +
 	"\fOptionsEntry\x12\x10\n" +
@@ -628,11 +628,9 @@ const file_spec_proto_rawDesc = "" +
 	"\vtarget_host\x18\x03 \x01(\tR\n" +
 	"targetHost\x12\x1f\n" +
 	"\vtarget_port\x18\x04 \x01(\x05R\n" +
-	"targetPort\"\x90\x02\n" +
-	"\vKubectlSpec\x12\x1e\n" +
-	"\n" +
-	"kubeconfig\x18\x01 \x01(\tR\n" +
-	"kubeconfig\x12\x18\n" +
+	"targetPort\"\x97\x02\n" +
+	"\vKubectlSpec\x12%\n" +
+	"\x0ekubeconfig_key\x18\x01 \x01(\tR\rkubeconfigKey\x12\x18\n" +
 	"\acontext\x18\x02 \x01(\tR\acontext\x12\x1c\n" +
 	"\tnamespace\x18\x03 \x01(\tR\tnamespace\x12\x1a\n" +
 	"\bresource\x18\x04 \x01(\tR\bresource\x125\n" +

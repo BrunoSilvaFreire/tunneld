@@ -23,7 +23,7 @@ type Spec interface {
 	Name() string
 	Type() string
 	Dependencies() []string
-	BuildCommand(ctx context.Context) (*exec.Cmd, error)
+	BuildCommand(ctx context.Context, keyDir string) (*exec.Cmd, error)
 	HealthCheck() *pb.HealthCheckSpec
 	RestartPolicy() *pb.RestartPolicySpec
 	StartupTimeout() time.Duration

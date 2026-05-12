@@ -23,7 +23,7 @@ message SSHSpec {
   string user = 1;
   string host = 2;
   int32 port = 3;
-  string identity_file = 4;
+  string identity_key = 4;
   repeated SSHForward local_forwards = 5;
   map<string, string> options = 6;
 }
@@ -36,7 +36,7 @@ message SSHForward {
 }
 
 message KubectlSpec {
-  string kubeconfig = 1;
+  string kubeconfig_key = 1;
   string context = 2;
   string namespace = 3;
   string resource = 4;

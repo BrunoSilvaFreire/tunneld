@@ -22,7 +22,7 @@ var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run the tunneld supervisor daemon",
 	Run: func(cmd *cobra.Command, args []string) {
-		run(viper.GetString("config"), viper.GetString("socket"))
+		run(viper.GetString("config"), viper.GetString("socket"), viper.GetString("key-dir"))
 	},
 }
 
@@ -30,7 +30,7 @@ func init() {
 	rootCmd.AddCommand(runCmd)
 }
 
-func run(path, socketPath string) {
+func run(path, socketPath, keyDirPath string) {
 	cfg, err := config.Load(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -46,7 +46,7 @@ func run(path, socketPath string) {
 	}
 	specs, _ := cfg.ToSpecs()
 	planner := dependency.NewPlanner(specs)
-	supervisor := daemon.NewSupervisor(planner)
+	supervisor := daemon.NewSupervisor(planner, cfg, keyDirPath)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -58,10 +58,14 @@ func run(path, socketPath string) {
 	if err != nil {
 		log.Fatalf("Failed to listen on %s: %v", socketPath, err)
 	}
+	if err := os.Chmod(socketPath, 0660); err != nil {
+		log.Printf("Warning: failed to set socket permissions: %v", err)
+	}
 	defer os.Remove(socketPath)
 
 	s := grpc.NewServer()
 	pb.RegisterTunnelServiceServer(s, api.NewTunnelServer(supervisor))
+	pb.RegisterKeyServiceServer(s, api.NewKeyServer(supervisor))
 
 	go func() {
 		log.Printf("gRPC server listening on %s", socketPath)

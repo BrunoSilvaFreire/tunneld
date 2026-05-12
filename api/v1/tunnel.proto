@@ -13,12 +13,25 @@ service TunnelService {
   rpc Wait(WaitRequest) returns (WaitResponse);
   rpc Create(CreateRequest) returns (CreateResponse);
   rpc Delete(DeleteRequest) returns (DeleteResponse);
+  rpc Logs(LogsRequest) returns (stream LogsResponse);
+  rpc Enable(EnableRequest) returns (EnableResponse);
+  rpc Disable(DisableRequest) returns (DisableResponse);
 }
 
 message TunnelStatus {
   string name = 1;
   string status = 2;
   TunnelSpec spec = 3;
+  string error = 4;
+}
+
+message LogsRequest {
+  string name = 1;
+  bool follow = 2;
+}
+
+message LogsResponse {
+  string line = 1;
 }
 
 message StatusRequest {
@@ -52,6 +65,7 @@ message WaitResponse {
 
 message CreateRequest {
   TunnelSpec spec = 1;
+  map<string, bytes> inline_keys = 2;
 }
 
 message CreateResponse {}
@@ -61,3 +75,40 @@ message DeleteRequest {
 }
 
 message DeleteResponse {}
+
+message EnableRequest {
+  string name = 1;
+}
+
+message EnableResponse {}
+
+message DisableRequest {
+  string name = 1;
+}
+
+message DisableResponse {}
+
+service KeyService {
+  rpc AddKey(AddKeyRequest) returns (AddKeyResponse);
+  rpc ListKeys(ListKeysRequest) returns (ListKeysResponse);
+  rpc DeleteKey(DeleteKeyRequest) returns (DeleteKeyResponse);
+}
+
+message AddKeyRequest {
+  string name = 1;
+  bytes content = 2;
+}
+
+message AddKeyResponse {}
+
+message ListKeysRequest {}
+
+message ListKeysResponse {
+  repeated string names = 1;
+}
+
+message DeleteKeyRequest {
+  string name = 1;
+}
+
+message DeleteKeyResponse {}

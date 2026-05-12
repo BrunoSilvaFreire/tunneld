@@ -38,6 +38,14 @@ options:
   server_address:
     description: The gRPC address of the tunneld server.
     type: str
+  wait:
+    description: Whether to wait for the tunnel to become healthy before returning.
+    type: bool
+    default: yes
+  wait_timeout:
+    description: Timeout in seconds to wait for health.
+    type: int
+    default: 30
 author:
   - Gemini CLI
 '''
@@ -54,6 +62,7 @@ EXAMPLES = r'''
         user: bruno
         host: remote.example.com
         port: 22
+        identity_key: ~/.ssh/id_rsa
         local_forwards:
           - listen_port: 8080
             target_host: localhost
@@ -85,23 +94,29 @@ class TunneldManager(object):
         self.bin_path = module.params.get('bin_path') or module.get_bin_path('tunnelctl', required=True)
         self.server_address = module.params.get('server_address')
 
-    def run_command(self, args):
+    def _run_command_raw(self, args):
         cmd = [self.bin_path]
         if self.server_address:
             cmd.extend(['--server', self.server_address])
         cmd.extend(args)
         return self.module.run_command(cmd)
 
-    def get_status(self, name):
-        rc, stdout, stderr = self.run_command(['status', name])
+    def run_command(self, args):
+        rc, stdout, stderr = self._run_command_raw(args)
         if rc != 0:
-            if "not found" in stderr.lower():
+            self.module.fail_json(msg="Command %s failed (rc=%d): %s %s" % (" ".join(args), rc, stdout, stderr))
+        return rc, stdout, stderr
+
+    def get_status(self, name):
+        rc, stdout, stderr = self._run_command_raw(['status', name])
+        if rc != 0:
+            if "not found" in stderr.lower() or "not found" in stdout.lower():
                 return None
-            self.module.fail_json(msg="Failed to get tunnel status: %s" % stderr)
+            self.module.fail_json(msg="Failed to get tunnel status: %s %s" % (stdout, stderr))
         
         # Parse status output. Example:
-        # NAME                 TYPE       STATUS     DEPENDENCIES
-        # my-ssh-tunnel        ssh        running    []
+        # NAME                 TYPE       STATUS     ERROR                DEPENDENCIES
+        # my-ssh-tunnel        ssh        running                         []
         lines = stdout.strip().splitlines()
         if len(lines) < 2:
             return None
@@ -130,26 +145,24 @@ class TunneldManager(object):
             with os.fdopen(fd, 'w') as f:
                 yaml.dump(full_config, f)
             
-            rc, stdout, stderr = self.run_command(['load', path])
+            rc, stdout, stderr = self._run_command_raw(['load', path])
             if rc != 0:
-                self.module.fail_json(msg="Failed to load tunnel: %s" % stderr)
+                self.module.fail_json(msg="Failed to load tunnel: %s %s" % (stdout, stderr))
         finally:
             os.remove(path)
 
-    def start_tunnel(self, name):
-        rc, stdout, stderr = self.run_command(['start', name])
-        if rc != 0:
-            self.module.fail_json(msg="Failed to start tunnel: %s" % stderr)
+    def start_tunnel(self, name, wait=True, timeout=30):
+        self.run_command(['start', name])
+        
+        if wait:
+            # Wait for healthy
+            self._run_command_raw(['wait', name, '--timeout', str(timeout)])
 
     def stop_tunnel(self, name):
-        rc, stdout, stderr = self.run_command(['stop', name])
-        if rc != 0:
-            self.module.fail_json(msg="Failed to stop tunnel: %s" % stderr)
+        self.run_command(['stop', name])
 
     def delete_tunnel(self, name):
-        rc, stdout, stderr = self.run_command(['delete', name])
-        if rc != 0:
-            self.module.fail_json(msg="Failed to delete tunnel: %s" % stderr)
+        self.run_command(['delete', name])
 
 def main():
     module = AnsibleModule(
@@ -159,6 +172,8 @@ def main():
             definition=dict(type='dict'),
             bin_path=dict(type='str'),
             server_address=dict(type='str'),
+            wait=dict(type='bool', default=True),
+            wait_timeout=dict(type='int', default=30),
         ),
         supports_check_mode=True
     )
@@ -166,6 +181,8 @@ def main():
     name = module.params['name']
     state = module.params['state']
     definition = module.params['definition']
+    wait = module.params['wait']
+    wait_timeout = module.params['wait_timeout']
 
     manager = TunneldManager(module)
     current_status = manager.get_status(name)
@@ -196,17 +213,23 @@ def main():
         result['changed'] = True
         # Refresh status after load
         current_status = manager.get_status(name)
+        if not current_status:
+             module.fail_json(msg="Failed to retrieve status for tunnel %q after loading." % name)
     else:
         # TODO: Implement diffing if definition is provided to handle updates
         pass
 
     if state == 'started':
+        if not current_status:
+            module.fail_json(msg="Cannot start tunnel %q: status not found" % name)
         if current_status['status'] != 'running':
             if module.check_mode:
                 module.exit_json(changed=True)
-            manager.start_tunnel(name)
+            manager.start_tunnel(name, wait=wait, timeout=wait_timeout)
             result['changed'] = True
     elif state == 'stopped':
+        if not current_status:
+            module.exit_json(**result) # Already absent?
         if current_status['status'] != 'stopped':
             if module.check_mode:
                 module.exit_json(changed=True)

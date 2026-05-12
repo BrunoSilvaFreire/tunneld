@@ -4,6 +4,8 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
+User=tunneld
+Group=tunneld
 ExecStart=/usr/local/bin/tunneld --config /etc/tunneld/tunnels.yaml run
 Restart=always
 RestartSec=3

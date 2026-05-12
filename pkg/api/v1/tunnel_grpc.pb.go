@@ -19,12 +19,15 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	TunnelService_Status_FullMethodName = "/tunnel.v1.TunnelService/Status"
-	TunnelService_Start_FullMethodName  = "/tunnel.v1.TunnelService/Start"
-	TunnelService_Stop_FullMethodName   = "/tunnel.v1.TunnelService/Stop"
-	TunnelService_Wait_FullMethodName   = "/tunnel.v1.TunnelService/Wait"
-	TunnelService_Create_FullMethodName = "/tunnel.v1.TunnelService/Create"
-	TunnelService_Delete_FullMethodName = "/tunnel.v1.TunnelService/Delete"
+	TunnelService_Status_FullMethodName  = "/tunnel.v1.TunnelService/Status"
+	TunnelService_Start_FullMethodName   = "/tunnel.v1.TunnelService/Start"
+	TunnelService_Stop_FullMethodName    = "/tunnel.v1.TunnelService/Stop"
+	TunnelService_Wait_FullMethodName    = "/tunnel.v1.TunnelService/Wait"
+	TunnelService_Create_FullMethodName  = "/tunnel.v1.TunnelService/Create"
+	TunnelService_Delete_FullMethodName  = "/tunnel.v1.TunnelService/Delete"
+	TunnelService_Logs_FullMethodName    = "/tunnel.v1.TunnelService/Logs"
+	TunnelService_Enable_FullMethodName  = "/tunnel.v1.TunnelService/Enable"
+	TunnelService_Disable_FullMethodName = "/tunnel.v1.TunnelService/Disable"
 )
 
 // TunnelServiceClient is the client API for TunnelService service.
@@ -37,6 +40,9 @@ type TunnelServiceClient interface {
 	Wait(ctx context.Context, in *WaitRequest, opts ...grpc.CallOption) (*WaitResponse, error)
 	Create(ctx context.Context, in *CreateRequest, opts ...grpc.CallOption) (*CreateResponse, error)
 	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
+	Logs(ctx context.Context, in *LogsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[LogsResponse], error)
+	Enable(ctx context.Context, in *EnableRequest, opts ...grpc.CallOption) (*EnableResponse, error)
+	Disable(ctx context.Context, in *DisableRequest, opts ...grpc.CallOption) (*DisableResponse, error)
 }
 
 type tunnelServiceClient struct {
@@ -107,6 +113,45 @@ func (c *tunnelServiceClient) Delete(ctx context.Context, in *DeleteRequest, opt
 	return out, nil
 }
 
+func (c *tunnelServiceClient) Logs(ctx context.Context, in *LogsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[LogsResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &TunnelService_ServiceDesc.Streams[0], TunnelService_Logs_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[LogsRequest, LogsResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type TunnelService_LogsClient = grpc.ServerStreamingClient[LogsResponse]
+
+func (c *tunnelServiceClient) Enable(ctx context.Context, in *EnableRequest, opts ...grpc.CallOption) (*EnableResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EnableResponse)
+	err := c.cc.Invoke(ctx, TunnelService_Enable_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tunnelServiceClient) Disable(ctx context.Context, in *DisableRequest, opts ...grpc.CallOption) (*DisableResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DisableResponse)
+	err := c.cc.Invoke(ctx, TunnelService_Disable_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TunnelServiceServer is the server API for TunnelService service.
 // All implementations must embed UnimplementedTunnelServiceServer
 // for forward compatibility.
@@ -117,6 +162,9 @@ type TunnelServiceServer interface {
 	Wait(context.Context, *WaitRequest) (*WaitResponse, error)
 	Create(context.Context, *CreateRequest) (*CreateResponse, error)
 	Delete(context.Context, *DeleteRequest) (*DeleteResponse, error)
+	Logs(*LogsRequest, grpc.ServerStreamingServer[LogsResponse]) error
+	Enable(context.Context, *EnableRequest) (*EnableResponse, error)
+	Disable(context.Context, *DisableRequest) (*DisableResponse, error)
 	mustEmbedUnimplementedTunnelServiceServer()
 }
 
@@ -144,6 +192,15 @@ func (UnimplementedTunnelServiceServer) Create(context.Context, *CreateRequest) 
 }
 func (UnimplementedTunnelServiceServer) Delete(context.Context, *DeleteRequest) (*DeleteResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Delete not implemented")
+}
+func (UnimplementedTunnelServiceServer) Logs(*LogsRequest, grpc.ServerStreamingServer[LogsResponse]) error {
+	return status.Error(codes.Unimplemented, "method Logs not implemented")
+}
+func (UnimplementedTunnelServiceServer) Enable(context.Context, *EnableRequest) (*EnableResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Enable not implemented")
+}
+func (UnimplementedTunnelServiceServer) Disable(context.Context, *DisableRequest) (*DisableResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Disable not implemented")
 }
 func (UnimplementedTunnelServiceServer) mustEmbedUnimplementedTunnelServiceServer() {}
 func (UnimplementedTunnelServiceServer) testEmbeddedByValue()                       {}
@@ -274,6 +331,53 @@ func _TunnelService_Delete_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TunnelService_Logs_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(LogsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(TunnelServiceServer).Logs(m, &grpc.GenericServerStream[LogsRequest, LogsResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type TunnelService_LogsServer = grpc.ServerStreamingServer[LogsResponse]
+
+func _TunnelService_Enable_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EnableRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TunnelServiceServer).Enable(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TunnelService_Enable_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TunnelServiceServer).Enable(ctx, req.(*EnableRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TunnelService_Disable_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DisableRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TunnelServiceServer).Disable(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TunnelService_Disable_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TunnelServiceServer).Disable(ctx, req.(*DisableRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TunnelService_ServiceDesc is the grpc.ServiceDesc for TunnelService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -304,6 +408,198 @@ var TunnelService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Delete",
 			Handler:    _TunnelService_Delete_Handler,
+		},
+		{
+			MethodName: "Enable",
+			Handler:    _TunnelService_Enable_Handler,
+		},
+		{
+			MethodName: "Disable",
+			Handler:    _TunnelService_Disable_Handler,
+		},
+	},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "Logs",
+			Handler:       _TunnelService_Logs_Handler,
+			ServerStreams: true,
+		},
+	},
+	Metadata: "tunnel.proto",
+}
+
+const (
+	KeyService_AddKey_FullMethodName    = "/tunnel.v1.KeyService/AddKey"
+	KeyService_ListKeys_FullMethodName  = "/tunnel.v1.KeyService/ListKeys"
+	KeyService_DeleteKey_FullMethodName = "/tunnel.v1.KeyService/DeleteKey"
+)
+
+// KeyServiceClient is the client API for KeyService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type KeyServiceClient interface {
+	AddKey(ctx context.Context, in *AddKeyRequest, opts ...grpc.CallOption) (*AddKeyResponse, error)
+	ListKeys(ctx context.Context, in *ListKeysRequest, opts ...grpc.CallOption) (*ListKeysResponse, error)
+	DeleteKey(ctx context.Context, in *DeleteKeyRequest, opts ...grpc.CallOption) (*DeleteKeyResponse, error)
+}
+
+type keyServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewKeyServiceClient(cc grpc.ClientConnInterface) KeyServiceClient {
+	return &keyServiceClient{cc}
+}
+
+func (c *keyServiceClient) AddKey(ctx context.Context, in *AddKeyRequest, opts ...grpc.CallOption) (*AddKeyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AddKeyResponse)
+	err := c.cc.Invoke(ctx, KeyService_AddKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *keyServiceClient) ListKeys(ctx context.Context, in *ListKeysRequest, opts ...grpc.CallOption) (*ListKeysResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListKeysResponse)
+	err := c.cc.Invoke(ctx, KeyService_ListKeys_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *keyServiceClient) DeleteKey(ctx context.Context, in *DeleteKeyRequest, opts ...grpc.CallOption) (*DeleteKeyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteKeyResponse)
+	err := c.cc.Invoke(ctx, KeyService_DeleteKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// KeyServiceServer is the server API for KeyService service.
+// All implementations must embed UnimplementedKeyServiceServer
+// for forward compatibility.
+type KeyServiceServer interface {
+	AddKey(context.Context, *AddKeyRequest) (*AddKeyResponse, error)
+	ListKeys(context.Context, *ListKeysRequest) (*ListKeysResponse, error)
+	DeleteKey(context.Context, *DeleteKeyRequest) (*DeleteKeyResponse, error)
+	mustEmbedUnimplementedKeyServiceServer()
+}
+
+// UnimplementedKeyServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedKeyServiceServer struct{}
+
+func (UnimplementedKeyServiceServer) AddKey(context.Context, *AddKeyRequest) (*AddKeyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AddKey not implemented")
+}
+func (UnimplementedKeyServiceServer) ListKeys(context.Context, *ListKeysRequest) (*ListKeysResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListKeys not implemented")
+}
+func (UnimplementedKeyServiceServer) DeleteKey(context.Context, *DeleteKeyRequest) (*DeleteKeyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteKey not implemented")
+}
+func (UnimplementedKeyServiceServer) mustEmbedUnimplementedKeyServiceServer() {}
+func (UnimplementedKeyServiceServer) testEmbeddedByValue()                    {}
+
+// UnsafeKeyServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to KeyServiceServer will
+// result in compilation errors.
+type UnsafeKeyServiceServer interface {
+	mustEmbedUnimplementedKeyServiceServer()
+}
+
+func RegisterKeyServiceServer(s grpc.ServiceRegistrar, srv KeyServiceServer) {
+	// If the following call panics, it indicates UnimplementedKeyServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&KeyService_ServiceDesc, srv)
+}
+
+func _KeyService_AddKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(KeyServiceServer).AddKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: KeyService_AddKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(KeyServiceServer).AddKey(ctx, req.(*AddKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _KeyService_ListKeys_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListKeysRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(KeyServiceServer).ListKeys(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: KeyService_ListKeys_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(KeyServiceServer).ListKeys(ctx, req.(*ListKeysRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _KeyService_DeleteKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(KeyServiceServer).DeleteKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: KeyService_DeleteKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(KeyServiceServer).DeleteKey(ctx, req.(*DeleteKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// KeyService_ServiceDesc is the grpc.ServiceDesc for KeyService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var KeyService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "tunnel.v1.KeyService",
+	HandlerType: (*KeyServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "AddKey",
+			Handler:    _KeyService_AddKey_Handler,
+		},
+		{
+			MethodName: "ListKeys",
+			Handler:    _KeyService_ListKeys_Handler,
+		},
+		{
+			MethodName: "DeleteKey",
+			Handler:    _KeyService_DeleteKey_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -12,7 +12,8 @@ import (
 )
 
 type Config struct {
-	Tunnels map[string]TunnelConfig `yaml:"tunnels"`
+	Tunnels  map[string]TunnelConfig `yaml:"tunnels"`
+	filePath string
 }
 
 type TunnelConfig struct {
@@ -45,7 +46,7 @@ type SSHConfig struct {
 	User          string            `yaml:"user"`
 	Host          string            `yaml:"host"`
 	Port          int               `yaml:"port"`
-	IdentityFile  string            `yaml:"identity_file"`
+	IdentityKey   string            `yaml:"identity_key"`
 	LocalForwards []SSHForward      `yaml:"local_forwards"`
 	Options       map[string]string `yaml:"options"`
 }
@@ -58,7 +59,7 @@ type SSHForward struct {
 }
 
 type KubectlConfig struct {
-	Kubeconfig            string           `yaml:"kubeconfig"`
+	KubeconfigKey         string           `yaml:"kubeconfig_key"`
 	Context               string           `yaml:"context"`
 	Namespace             string           `yaml:"namespace"`
 	Resource              string           `yaml:"resource"`
@@ -83,8 +84,32 @@ func Load(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
 	}
+	cfg.filePath = path
 
 	return &cfg, nil
+}
+
+func (c *Config) Save() error {
+	if c.filePath == "" {
+		return fmt.Errorf("config file path not set")
+	}
+
+	data, err := yaml.Marshal(c)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %v", err)
+	}
+
+	return os.WriteFile(c.filePath, data, 0644)
+}
+
+func (c *Config) SetEnabled(name string, enabled bool) error {
+	t, ok := c.Tunnels[name]
+	if !ok {
+		return fmt.Errorf("tunnel %q not found in config", name)
+	}
+	t.Enabled = enabled
+	c.Tunnels[name] = t
+	return c.Save()
 }
 
 func (t *TunnelConfig) ToProto(name string) (*pb.TunnelSpec, error) {
@@ -126,7 +151,7 @@ func (t *TunnelConfig) ToProto(name string) (*pb.TunnelSpec, error) {
 				User:          t.SSH.User,
 				Host:          t.SSH.Host,
 				Port:          int32(t.SSH.Port),
-				IdentityFile:  t.SSH.IdentityFile,
+				IdentityKey:   t.SSH.IdentityKey,
 				LocalForwards: forwards,
 				Options:       t.SSH.Options,
 			},
@@ -145,7 +170,7 @@ func (t *TunnelConfig) ToProto(name string) (*pb.TunnelSpec, error) {
 		}
 		p.Type = &pb.TunnelSpec_Kubectl{
 			Kubectl: &pb.KubectlSpec{
-				Kubeconfig:            t.Kubectl.Kubeconfig,
+				KubeconfigKey:         t.Kubectl.KubeconfigKey,
 				Context:               t.Kubectl.Context,
 				Namespace:             t.Kubectl.Namespace,
 				Resource:              t.Kubectl.Resource,

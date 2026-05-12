@@ -17,7 +17,7 @@ type mockSpec struct {
 func (m mockSpec) Name() string                     { return m.name }
 func (m mockSpec) Type() string                     { return "mock" }
 func (m mockSpec) Dependencies() []string           { return m.deps }
-func (m mockSpec) BuildCommand(context.Context) (*exec.Cmd, error) { return nil, nil }
+func (m mockSpec) BuildCommand(context.Context, string) (*exec.Cmd, error) { return nil, nil }
 func (m mockSpec) HealthCheck() *pb.HealthCheckSpec { return &pb.HealthCheckSpec{} }
 func (m mockSpec) RestartPolicy() *pb.RestartPolicySpec { return &pb.RestartPolicySpec{} }
 func (m mockSpec) StartupTimeout() time.Duration    { return 0 }

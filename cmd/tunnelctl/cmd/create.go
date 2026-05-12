@@ -42,8 +42,14 @@ var createCmd = &cobra.Command{
 			log.Fatalf("failed to convert to proto: %v", err)
 		}
 
+		inlineKeys, err := slurpKeys(protoSpec)
+		if err != nil {
+			log.Fatalf("failed to slurp keys: %v", err)
+		}
+
 		_, err = client.Create(context.Background(), &pb.CreateRequest{
-			Spec: protoSpec,
+			Spec:       protoSpec,
+			InlineKeys: inlineKeys,
 		})
 		if err != nil {
 			log.Fatalf("could not create: %v", err)

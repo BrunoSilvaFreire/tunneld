@@ -11,6 +11,7 @@ import (
 var (
 	cfgFile    string
 	socketPath string
+	keyDir     string
 )
 
 var rootCmd = &cobra.Command{
@@ -31,9 +32,11 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "tunnels.yaml", "Path to config file")
 	rootCmd.PersistentFlags().StringVar(&socketPath, "socket", "/tmp/tunneld.sock", "Path to gRPC unix socket")
+	rootCmd.PersistentFlags().StringVar(&keyDir, "key-dir", "/var/lib/tunneld/keys", "Directory to store managed keys")
 
 	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
 	viper.BindPFlag("socket", rootCmd.PersistentFlags().Lookup("socket"))
+	viper.BindPFlag("key-dir", rootCmd.PersistentFlags().Lookup("key-dir"))
 }
 
 func initConfig() {

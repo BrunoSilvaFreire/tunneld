@@ -2,19 +2,33 @@ package tunnel
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
 )
 
 func TestSSHBuildCommand(t *testing.T) {
+	keyDir, err := os.MkdirTemp("", "keydir")
+	if err != nil {
+		t.Fatalf("failed to create temp keydir: %v", err)
+	}
+	defer os.RemoveAll(keyDir)
+
+	keyName := "id_test"
+	keyPath := filepath.Join(keyDir, keyName)
+	if err := os.WriteFile(keyPath, []byte("fake-key"), 0600); err != nil {
+		t.Fatalf("failed to create fake key: %v", err)
+	}
+
 	spec := NewSSHSpec(
 		"test-ssh",
 		nil,
 		"user",
 		"host.com",
 		2222,
-		"/path/to/id",
+		keyName,
 		[]SSHForward{
 			{ListenAddress: "127.0.0.1", ListenPort: 8080, TargetHost: "remote", TargetPort: 80},
 		},
@@ -25,13 +39,13 @@ func TestSSHBuildCommand(t *testing.T) {
 		0,
 	)
 
-	cmd, err := spec.BuildCommand(context.Background())
+	cmd, err := spec.BuildCommand(context.Background(), keyDir)
 	if err != nil {
 		t.Fatalf("BuildCommand failed: %v", err)
 	}
 
 	expectedArgs := []string{
-		"ssh", "-N", "-p", "2222", "-i", "/path/to/id",
+		"ssh", "-N", "-o", "BatchMode=yes", "-p", "2222", "-i", keyPath,
 		"-o", "StrictHostKeyChecking=no",
 		"-L", "127.0.0.1:8080:remote:80",
 		"user@host.com",
@@ -50,10 +64,16 @@ func TestSSHBuildCommand(t *testing.T) {
 }
 
 func TestKubectlBuildCommand(t *testing.T) {
+	keyDir, err := os.MkdirTemp("", "keydir")
+	if err != nil {
+		t.Fatalf("failed to create temp keydir: %v", err)
+	}
+	defer os.RemoveAll(keyDir)
+
 	spec := NewKubectlSpec(
 		"test-kube",
 		[]string{"test-ssh"},
-		"/path/to/kubeconfig",
+		"kubeconfig",
 		"prod",
 		"myns",
 		"svc/mysvc",
@@ -68,7 +88,7 @@ func TestKubectlBuildCommand(t *testing.T) {
 		0,
 	)
 
-	cmd, err := spec.BuildCommand(context.Background())
+	cmd, err := spec.BuildCommand(context.Background(), keyDir)
 	if err != nil {
 		t.Fatalf("BuildCommand failed: %v", err)
 	}
@@ -76,7 +96,7 @@ func TestKubectlBuildCommand(t *testing.T) {
 	args := strings.Join(cmd.Args, " ")
 	expectedParts := []string{
 		"kubectl",
-		"--kubeconfig /path/to/kubeconfig",
+		"--kubeconfig " + filepath.Join(keyDir, "kubeconfig"),
 		"--context prod",
 		"--server https://api.server",
 		"--insecure-skip-tls-verify=true",

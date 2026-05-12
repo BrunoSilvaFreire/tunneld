@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
+	"github.com/BrunoSilvaFreire/tunneld/internal/config"
 	"github.com/BrunoSilvaFreire/tunneld/internal/dependency"
 	"github.com/BrunoSilvaFreire/tunneld/internal/health"
 	"github.com/BrunoSilvaFreire/tunneld/internal/tunnel"
@@ -14,15 +17,31 @@ import (
 type Supervisor struct {
 	planner   *dependency.Planner
 	processes map[string]*Process
+	config    *config.Config
+	keyDir    string
 	mu        sync.RWMutex
 	ctx       context.Context
 }
 
-func NewSupervisor(planner *dependency.Planner) *Supervisor {
+func NewSupervisor(planner *dependency.Planner, cfg *config.Config, keyDir string) *Supervisor {
 	return &Supervisor{
 		planner:   planner,
 		processes: make(map[string]*Process),
+		config:    cfg,
+		keyDir:    keyDir,
 	}
+}
+
+func (s *Supervisor) GetKeyDir() string {
+	return s.keyDir
+}
+
+func (s *Supervisor) SaveKey(name string, content []byte) error {
+	if err := os.MkdirAll(s.keyDir, 0700); err != nil {
+		return err
+	}
+	keyPath := filepath.Join(s.keyDir, name)
+	return os.WriteFile(keyPath, content, 0600)
 }
 
 func (s *Supervisor) Run(ctx context.Context) error {
@@ -33,7 +52,7 @@ func (s *Supervisor) Run(ctx context.Context) error {
 	}
 
 	for _, spec := range order {
-		p := NewProcess(spec)
+		p := NewProcess(spec, s.keyDir)
 		s.mu.Lock()
 		s.processes[spec.Name()] = p
 		s.mu.Unlock()
@@ -53,7 +72,18 @@ func (s *Supervisor) Run(ctx context.Context) error {
 type TunnelInfo struct {
 	Name   string
 	Status tunnel.Status
+	Error  string
 	Spec   tunnel.Spec
+}
+
+func (s *Supervisor) GetProcess(name string) (*Process, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	p, ok := s.processes[name]
+	if !ok {
+		return nil, fmt.Errorf("tunnel %q not found", name)
+	}
+	return p, nil
 }
 
 func (s *Supervisor) ListTunnels() []TunnelInfo {
@@ -62,9 +92,14 @@ func (s *Supervisor) ListTunnels() []TunnelInfo {
 
 	var infos []TunnelInfo
 	for name, p := range s.processes {
+		errStr := ""
+		if p.LastError() != nil {
+			errStr = p.LastError().Error()
+		}
 		infos = append(infos, TunnelInfo{
 			Name:   name,
 			Status: p.Status(),
+			Error:  errStr,
 			Spec:   p.spec,
 		})
 	}
@@ -85,7 +120,7 @@ func (s *Supervisor) AddTunnel(ctx context.Context, spec tunnel.Spec) error {
 		return fmt.Errorf("invalid dependencies: %v", err)
 	}
 
-	s.processes[spec.Name()] = NewProcess(spec)
+	s.processes[spec.Name()] = NewProcess(spec, s.keyDir)
 	return nil
 }
 
@@ -104,6 +139,40 @@ func (s *Supervisor) RemoveTunnel(name string) error {
 	return nil
 }
 
+func (s *Supervisor) EnableTunnel(ctx context.Context, name string) error {
+	s.mu.Lock()
+	p, ok := s.processes[name]
+	if !ok {
+		s.mu.Unlock()
+		return fmt.Errorf("tunnel %q not found", name)
+	}
+
+	if err := s.config.SetEnabled(name, true); err != nil {
+		s.mu.Unlock()
+		return fmt.Errorf("failed to update config: %v", err)
+	}
+	s.mu.Unlock()
+
+	return s.startAndNotify(s.ctx, p)
+}
+
+func (s *Supervisor) DisableTunnel(name string) error {
+	s.mu.Lock()
+	p, ok := s.processes[name]
+	if !ok {
+		s.mu.Unlock()
+		return fmt.Errorf("tunnel %q not found", name)
+	}
+
+	if err := s.config.SetEnabled(name, false); err != nil {
+		s.mu.Unlock()
+		return fmt.Errorf("failed to update config: %v", err)
+	}
+	s.mu.Unlock()
+
+	return p.Stop()
+}
+
 func (s *Supervisor) StartTunnel(ctx context.Context, name string) error {
 	s.mu.RLock()
 	p, ok := s.processes[name]
@@ -112,7 +181,17 @@ func (s *Supervisor) StartTunnel(ctx context.Context, name string) error {
 		return fmt.Errorf("tunnel %q not found", name)
 	}
 
-	return s.startAndNotify(ctx, p)
+	status := p.Status()
+	if status == tunnel.StatusRunning || status == tunnel.StatusStarting {
+		// If it's already running or starting, just return success (idempotent)
+		// but check if the underlying process is actually alive.
+		if p.IsProcessAlive() {
+			return nil
+		}
+		// If process is dead but status is Running/Starting, we allow a restart.
+	}
+
+	return s.startAndNotify(s.ctx, p)
 }
 
 func (s *Supervisor) StopTunnel(name string) error {
@@ -206,10 +285,12 @@ func (s *Supervisor) startAndNotify(ctx context.Context, p *Process) error {
 					if p.Status() != tunnel.StatusRunning {
 						log.Printf("[%s] Healthy and running", spec.Name())
 						p.setStatus(tunnel.StatusRunning)
+						p.setError(nil)
 					}
 				} else {
 					if time.Since(start) > timeout {
 						log.Printf("[%s] Health check failed after timeout: %v", spec.Name(), err)
+						p.setError(fmt.Errorf("health check timeout: %v", err))
 						p.setStatus(tunnel.StatusFailed)
 						s.handleFailure(ctx, spec.Name())
 						return
@@ -231,6 +312,11 @@ func (s *Supervisor) handleFailure(ctx context.Context, name string) {
 	}
 
 	log.Printf("[%s] Handling failure...", name)
+
+	if p.ExpectedState() == "stopped" {
+		log.Printf("[%s] Expected state is stopped, skipping restart", name)
+		return
+	}
 
 	// 1. Find and stop dependents
 	s.mu.RLock()
