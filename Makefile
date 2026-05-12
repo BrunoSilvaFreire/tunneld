@@ -37,23 +37,38 @@ package-deb: build
 	mkdir -p pkg-build/DEBIAN
 	mkdir -p pkg-build/usr/local/bin
 	mkdir -p pkg-build/etc/tunneld
-	mkdir -p pkg-build/lib/systemd/system
 	mkdir -p pkg-build/usr/share/bash-completion/completions
-	
+
 	# Binaries
 	cp $(BINARY_TUNNELD) pkg-build/usr/local/bin/
 	cp $(BINARY_TUNNELCTL) pkg-build/usr/local/bin/
-	
+
 	# Bash completions
 	./$(BINARY_TUNNELD) completion bash > pkg-build/usr/share/bash-completion/completions/$(BINARY_TUNNELD)
 	./$(BINARY_TUNNELCTL) completion bash > pkg-build/usr/share/bash-completion/completions/$(BINARY_TUNNELCTL)
 
 	# Config sample
 	cp tunnels.yaml.sample pkg-build/etc/tunneld/tunnels.yaml.sample
-	
+
 	# Systemd unit
-	cp tunneld.service.sample pkg-build/lib/systemd/system/tunneld.service
-	
+	mkdir -p pkg-build/lib/systemd/system
+	@echo "[Unit]" > pkg-build/lib/systemd/system/tunneld.service
+	@echo "Description=Tunnel supervisor" >> pkg-build/lib/systemd/system/tunneld.service
+	@echo "After=network-online.target" >> pkg-build/lib/systemd/system/tunneld.service
+	@echo "Wants=network-online.target" >> pkg-build/lib/systemd/system/tunneld.service
+	@echo "" >> pkg-build/lib/systemd/system/tunneld.service
+	@echo "[Service]" >> pkg-build/lib/systemd/system/tunneld.service
+	@echo "User=tunneld" >> pkg-build/lib/systemd/system/tunneld.service
+	@echo "Group=tunneld" >> pkg-build/lib/systemd/system/tunneld.service
+	@echo "ExecStart=/usr/local/bin/tunneld --config /etc/tunneld/tunnels.yaml run" >> pkg-build/lib/systemd/system/tunneld.service
+	@echo "Restart=always" >> pkg-build/lib/systemd/system/tunneld.service
+	@echo "RestartSec=3" >> pkg-build/lib/systemd/system/tunneld.service
+	@echo "KillSignal=SIGTERM" >> pkg-build/lib/systemd/system/tunneld.service
+	@echo "TimeoutStopSec=30" >> pkg-build/lib/systemd/system/tunneld.service
+	@echo "" >> pkg-build/lib/systemd/system/tunneld.service
+	@echo "[Install]" >> pkg-build/lib/systemd/system/tunneld.service
+	@echo "WantedBy=multi-user.target" >> pkg-build/lib/systemd/system/tunneld.service
+
 	# Control file
 	echo "Package: $(BINARY_TUNNELD)" > pkg-build/DEBIAN/control
 	echo "Version: $(VERSION)" >> pkg-build/DEBIAN/control
@@ -82,4 +97,4 @@ package-deb: build
 
 package-zip: build
 	rm -f $(ZIP_PACKAGE)
-	zip $(ZIP_PACKAGE) $(BINARY_TUNNELD) $(BINARY_TUNNELCTL) tunnels.yaml.sample tunneld.service.sample
+	zip $(ZIP_PACKAGE) $(BINARY_TUNNELD) $(BINARY_TUNNELCTL) tunnels.yaml.sample

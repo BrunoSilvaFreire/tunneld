@@ -1,26 +1,76 @@
-# tunneld Ansible Modules
+# tunneld Ansible Collection
 
-This directory contains custom Ansible modules for managing `tunneld` tunnels via the `tunnelctl` CLI.
+This collection provides custom Ansible modules for managing `tunneld` tunnels via the `tunnelctl` CLI.
 
 ## Modules
 
-*   `tunneld_tunnel`: Manage the lifecycle of a `tunneld` tunnel (create, load, start, stop, delete).
-*   `tunneld_info`: Gather facts about tunnels managed by `tunneld`.
+- `tunneld_tunnel` — Manage the lifecycle of a `tunneld` tunnel (`create`, `load`, `start`, `stop`, `delete`).
+- `tunneld_info` — Gather facts about tunnels managed by `tunneld`.
 
 ## Prerequisites
 
-*   Python 3.x
-*   Ansible
-*   `tunneld` and `tunnelctl` installed and configured on the target system (or locally if running against `localhost`).
+- Python 3.x
+- Ansible
+- `tunneld` and `tunnelctl` installed and configured on the target system (or locally if running against `localhost`).
 
 ## Installation
 
-To use these modules in your playbooks, you can add this directory to your `ANSIBLE_LIBRARY` environment variable, or place the `plugins/modules` directory in the root of your Ansible playbook repository alongside your playbooks, typically structured as `library/` or configure the `library` path in `ansible.cfg`.
+### Via Ansible Galaxy (Recommended)
 
-Example using environment variable:
+Install the collection directly from GitHub:
+
+```bash
+ansible-galaxy collection install git+https://github.com/BrunoSilvaFreire/tunneld.git#/ansible
+```
+
+When using this method, reference modules by their **fully qualified collection name (FQCN)**:
+
+```yaml
+- name: Ensure an SSH tunnel is running
+  tunneld.tunneld.tunneld_tunnel:
+    name: my-ssh-tunnel
+    state: started
+    definition:
+      enabled: true
+      type: ssh
+      ssh:
+        user: admin
+        host: remote.example.com
+        port: 22
+        local_forwards:
+          - listen_port: 8080
+            target_host: localhost
+            target_port: 80
+      health:
+        type: tcp
+        address: localhost:8080
+        interval: 5s
+
+- name: Gather facts about all tunnels
+  tunneld.tunneld.tunneld_info:
+  register: all_tunnels
+```
+
+### Manual Installation
+
+If you prefer not to install via Galaxy, add the `plugins/modules` directory to your `ANSIBLE_LIBRARY` environment variable, or place it in your playbook's `library/` directory (or configure the `library` path in `ansible.cfg`).
+
+Example using the environment variable:
+
 ```bash
 export ANSIBLE_LIBRARY=/path/to/tunneld/ansible/plugins/modules
 ansible-playbook playbook.yaml
+```
+
+When using manual installation, you can use the short module names:
+
+```yaml
+- name: Ensure an SSH tunnel is running
+  tunneld_tunnel:
+    name: my-ssh-tunnel
+    state: started
+    definition:
+      ...
 ```
 
 ## Usage
@@ -31,7 +81,7 @@ The `tunneld_tunnel` module allows declarative management of tunnels.
 
 ```yaml
 - name: Ensure an SSH tunnel is running
-  tunneld_tunnel:
+  tunneld.tunneld.tunneld_tunnel:
     name: my-ssh-tunnel
     state: started
     definition:
@@ -52,16 +102,17 @@ The `tunneld_tunnel` module allows declarative management of tunnels.
 ```
 
 **States:**
-*   `started`: Ensures the tunnel exists and is running.
-*   `stopped`: Ensures the tunnel exists but is stopped.
-*   `present`: Ensures the tunnel exists (loaded into `tunneld`).
-*   `absent`: Ensures the tunnel is deleted.
+
+- `started` — Ensures the tunnel exists and is running.
+- `stopped` — Ensures the tunnel exists but is stopped.
+- `present` — Ensures the tunnel exists (loaded into `tunneld`).
+- `absent` — Ensures the tunnel is deleted.
 
 ### Gathering Facts (`tunneld_info`)
 
 ```yaml
 - name: Gather facts about all tunnels
-  tunneld_info:
+  tunneld.tunneld.tunneld_info:
   register: all_tunnels
 
 - debug:
