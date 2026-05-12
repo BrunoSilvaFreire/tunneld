@@ -8,6 +8,7 @@ Persistent local tunnel supervisor daemon with gRPC control.
 - **Dependency Management:** Automatic startup order and failure cascading.
 - **gRPC API:** Programmatic control for automation pipelines.
 - **CLI Client:** `tunnelctl` for manual interaction.
+- **Bash Completion:** Built-in shell completion for all commands and flags.
 - **Health Checks:** Built-in TCP connectivity verification.
 
 ## Installation

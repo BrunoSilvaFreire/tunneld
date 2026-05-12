@@ -1,0 +1,38 @@
+package cmd
+
+import (
+	"context"
+	"fmt"
+	"log"
+
+	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
+	"github.com/spf13/cobra"
+)
+
+var waitTimeout int
+
+var waitCmd = &cobra.Command{
+	Use:   "wait <name>",
+	Short: "Wait for a tunnel to be healthy",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		client, conn := getClient()
+		defer conn.Close()
+
+		name := args[0]
+		fmt.Printf("Waiting for tunnel %q (timeout %ds)...\n", name, waitTimeout)
+		resp, err := client.Wait(context.Background(), &pb.WaitRequest{
+			Name:           name,
+			TimeoutSeconds: int64(waitTimeout),
+		})
+		if err != nil {
+			log.Fatalf("wait failed: %v", err)
+		}
+		fmt.Printf("Tunnel %q is %s\n", name, resp.Status)
+	},
+}
+
+func init() {
+	waitCmd.Flags().IntVar(&waitTimeout, "timeout", 30, "Timeout in seconds")
+	rootCmd.AddCommand(waitCmd)
+}

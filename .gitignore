@@ -1,6 +1,6 @@
 # Binaries
-tunneld
-tunnelctl
+/tunneld
+/tunnelctl
 
 # Packages
 *.deb

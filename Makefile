@@ -37,11 +37,16 @@ package-deb: build
 	mkdir -p pkg-build/usr/local/bin
 	mkdir -p pkg-build/etc/tunneld
 	mkdir -p pkg-build/lib/systemd/system
+	mkdir -p pkg-build/usr/share/bash-completion/completions
 	
 	# Binaries
 	cp $(BINARY_TUNNELD) pkg-build/usr/local/bin/
 	cp $(BINARY_TUNNELCTL) pkg-build/usr/local/bin/
 	
+	# Bash completions
+	./$(BINARY_TUNNELD) completion bash > pkg-build/usr/share/bash-completion/completions/$(BINARY_TUNNELD)
+	./$(BINARY_TUNNELCTL) completion bash > pkg-build/usr/share/bash-completion/completions/$(BINARY_TUNNELCTL)
+
 	# Config sample
 	cp tunnels.yaml.sample pkg-build/etc/tunneld/tunnels.yaml.sample
 	
