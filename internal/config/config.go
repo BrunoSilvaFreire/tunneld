@@ -229,5 +229,18 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("tunnel %q: %v", name, err)
 		}
 	}
+	seen := map[string]string{}
+	for name, t := range c.Tunnels {
+		if !t.Enabled {
+			continue
+		}
+		proto, _ := t.ToProto(name)
+		for _, key := range tunnel.LocalPortKeys(proto) {
+			if owner, ok := seen[key]; ok {
+				return fmt.Errorf("port conflict: tunnels %q and %q both claim %s", name, owner, key)
+			}
+			seen[key] = name
+		}
+	}
 	return nil
 }

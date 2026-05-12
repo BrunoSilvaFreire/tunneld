@@ -64,3 +64,10 @@ message RestartPolicySpec {
   google.protobuf.Duration delay = 2;
   int32 max_attempts = 3;
 }
+
+message ResolvedForward {
+  string local_address = 1;
+  int32 configured_port = 2; // 0 means dynamic was requested
+  int32 actual_port = 3;     // actual OS-assigned port
+  int32 remote_port = 4;     // remote/target port (for display)
+}

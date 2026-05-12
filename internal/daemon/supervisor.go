@@ -51,6 +51,16 @@ func (s *Supervisor) Run(ctx context.Context) error {
 		return err
 	}
 
+	seen := map[string]string{}
+	for _, spec := range order {
+		for _, key := range tunnel.LocalPortKeys(spec.ToProto()) {
+			if owner, ok := seen[key]; ok {
+				return fmt.Errorf("port conflict in config: %q and %q both claim %s", spec.Name(), owner, key)
+			}
+			seen[key] = spec.Name()
+		}
+	}
+
 	for _, spec := range order {
 		p := NewProcess(spec, s.keyDir)
 		s.mu.Lock()
@@ -58,8 +68,6 @@ func (s *Supervisor) Run(ctx context.Context) error {
 		s.mu.Unlock()
 
 		log.Printf("[%s] Initializing...", spec.Name())
-		// Only start if it was in initial config and we want it to start on boot
-		// In v1, we start everything in the initial planner order if Run is called.
 		if err := s.startAndNotify(ctx, p); err != nil {
 			log.Printf("[%s] Initial start failed: %v", spec.Name(), err)
 		}
@@ -70,10 +78,11 @@ func (s *Supervisor) Run(ctx context.Context) error {
 }
 
 type TunnelInfo struct {
-	Name   string
-	Status tunnel.Status
-	Error  string
-	Spec   tunnel.Spec
+	Name         string
+	Status       tunnel.Status
+	Error        string
+	Spec         tunnel.Spec
+	PortMappings []tunnel.PortMapping
 }
 
 func (s *Supervisor) GetProcess(name string) (*Process, error) {
@@ -97,13 +106,29 @@ func (s *Supervisor) ListTunnels() []TunnelInfo {
 			errStr = p.LastError().Error()
 		}
 		infos = append(infos, TunnelInfo{
-			Name:   name,
-			Status: p.Status(),
-			Error:  errStr,
-			Spec:   p.spec,
+			Name:         name,
+			Status:       p.Status(),
+			Error:        errStr,
+			Spec:         p.spec,
+			PortMappings: p.PortMappings(),
 		})
 	}
 	return infos
+}
+
+func (s *Supervisor) checkPortConflicts(spec tunnel.Spec) error {
+	newKeys := tunnel.LocalPortKeys(spec.ToProto())
+	for _, existing := range s.processes {
+		for _, key := range tunnel.LocalPortKeys(existing.spec.ToProto()) {
+			for _, nk := range newKeys {
+				if key == nk {
+					return fmt.Errorf("port conflict: %q and %q both claim %s",
+						spec.Name(), existing.spec.Name(), key)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func (s *Supervisor) AddTunnel(ctx context.Context, spec tunnel.Spec) error {
@@ -112,6 +137,10 @@ func (s *Supervisor) AddTunnel(ctx context.Context, spec tunnel.Spec) error {
 
 	if _, ok := s.processes[spec.Name()]; ok {
 		return fmt.Errorf("tunnel %q already exists", spec.Name())
+	}
+
+	if err := s.checkPortConflicts(spec); err != nil {
+		return err
 	}
 
 	s.planner.AddSpec(spec)
@@ -231,7 +260,11 @@ func (s *Supervisor) WaitHealthy(ctx context.Context, name string, timeout time.
 				return tunnel.StatusRunning, nil
 			}
 			if status == tunnel.StatusFailed {
-				return tunnel.StatusFailed, fmt.Errorf("tunnel failed")
+				policy := p.spec.RestartPolicy()
+				if policy == nil || policy.Policy == "never" {
+					return tunnel.StatusFailed, fmt.Errorf("tunnel failed")
+				}
+				// Tunnel has a restart policy; continue polling through transient failures.
 			}
 			if time.Now().After(deadline) {
 				return status, fmt.Errorf("timeout waiting for health")
@@ -249,15 +282,16 @@ func (s *Supervisor) startAndNotify(ctx context.Context, p *Process) error {
 	}
 
 	// Wait for health
-	h := health.NewChecker(spec.HealthCheck())
+	hSpec := p.EffectiveHealthCheck()
+	h := health.NewChecker(hSpec)
 	start := time.Now()
-	timeout := spec.HealthCheck().GetStartupTimeout().AsDuration()
+	timeout := hSpec.GetStartupTimeout().AsDuration()
 	if timeout == 0 {
 		timeout = 30 * time.Second
 	}
 
 	go func() {
-		interval := spec.HealthCheck().GetInterval().AsDuration()
+		interval := hSpec.GetInterval().AsDuration()
 		if interval <= 0 {
 			interval = 2 * time.Second
 		}
@@ -273,7 +307,7 @@ func (s *Supervisor) startAndNotify(ctx context.Context, p *Process) error {
 				s.handleFailure(ctx, spec.Name())
 				return
 			case <-ticker.C:
-				checkTimeout := spec.HealthCheck().GetTimeout().AsDuration()
+				checkTimeout := hSpec.GetTimeout().AsDuration()
 				if checkTimeout == 0 {
 					checkTimeout = 2 * time.Second
 				}

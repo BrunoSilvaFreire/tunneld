@@ -592,6 +592,74 @@ func (x *RestartPolicySpec) GetMaxAttempts() int32 {
 	return 0
 }
 
+type ResolvedForward struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	LocalAddress   string                 `protobuf:"bytes,1,opt,name=local_address,json=localAddress,proto3" json:"local_address,omitempty"`
+	ConfiguredPort int32                  `protobuf:"varint,2,opt,name=configured_port,json=configuredPort,proto3" json:"configured_port,omitempty"` // 0 means dynamic was requested
+	ActualPort     int32                  `protobuf:"varint,3,opt,name=actual_port,json=actualPort,proto3" json:"actual_port,omitempty"`             // actual OS-assigned port
+	RemotePort     int32                  `protobuf:"varint,4,opt,name=remote_port,json=remotePort,proto3" json:"remote_port,omitempty"`             // remote/target port (for display)
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ResolvedForward) Reset() {
+	*x = ResolvedForward{}
+	mi := &file_spec_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolvedForward) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolvedForward) ProtoMessage() {}
+
+func (x *ResolvedForward) ProtoReflect() protoreflect.Message {
+	mi := &file_spec_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolvedForward.ProtoReflect.Descriptor instead.
+func (*ResolvedForward) Descriptor() ([]byte, []int) {
+	return file_spec_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ResolvedForward) GetLocalAddress() string {
+	if x != nil {
+		return x.LocalAddress
+	}
+	return ""
+}
+
+func (x *ResolvedForward) GetConfiguredPort() int32 {
+	if x != nil {
+		return x.ConfiguredPort
+	}
+	return 0
+}
+
+func (x *ResolvedForward) GetActualPort() int32 {
+	if x != nil {
+		return x.ActualPort
+	}
+	return 0
+}
+
+func (x *ResolvedForward) GetRemotePort() int32 {
+	if x != nil {
+		return x.RemotePort
+	}
+	return 0
+}
+
 var File_spec_proto protoreflect.FileDescriptor
 
 const file_spec_proto_rawDesc = "" +
@@ -653,7 +721,14 @@ const file_spec_proto_rawDesc = "" +
 	"\x11RestartPolicySpec\x12\x16\n" +
 	"\x06policy\x18\x01 \x01(\tR\x06policy\x12/\n" +
 	"\x05delay\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\x05delay\x12!\n" +
-	"\fmax_attempts\x18\x03 \x01(\x05R\vmaxAttemptsB\x1dZ\x1btunneld/pkg/api/v1;tunnelv1b\x06proto3"
+	"\fmax_attempts\x18\x03 \x01(\x05R\vmaxAttempts\"\xa1\x01\n" +
+	"\x0fResolvedForward\x12#\n" +
+	"\rlocal_address\x18\x01 \x01(\tR\flocalAddress\x12'\n" +
+	"\x0fconfigured_port\x18\x02 \x01(\x05R\x0econfiguredPort\x12\x1f\n" +
+	"\vactual_port\x18\x03 \x01(\x05R\n" +
+	"actualPort\x12\x1f\n" +
+	"\vremote_port\x18\x04 \x01(\x05R\n" +
+	"remotePortB\x1dZ\x1btunneld/pkg/api/v1;tunnelv1b\x06proto3"
 
 var (
 	file_spec_proto_rawDescOnce sync.Once
@@ -667,7 +742,7 @@ func file_spec_proto_rawDescGZIP() []byte {
 	return file_spec_proto_rawDescData
 }
 
-var file_spec_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_spec_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_spec_proto_goTypes = []any{
 	(*TunnelSpec)(nil),          // 0: tunnel.v1.TunnelSpec
 	(*SSHSpec)(nil),             // 1: tunnel.v1.SSHSpec
@@ -676,23 +751,24 @@ var file_spec_proto_goTypes = []any{
 	(*KubectlForward)(nil),      // 4: tunnel.v1.KubectlForward
 	(*HealthCheckSpec)(nil),     // 5: tunnel.v1.HealthCheckSpec
 	(*RestartPolicySpec)(nil),   // 6: tunnel.v1.RestartPolicySpec
-	nil,                         // 7: tunnel.v1.SSHSpec.OptionsEntry
-	(*durationpb.Duration)(nil), // 8: google.protobuf.Duration
+	(*ResolvedForward)(nil),     // 7: tunnel.v1.ResolvedForward
+	nil,                         // 8: tunnel.v1.SSHSpec.OptionsEntry
+	(*durationpb.Duration)(nil), // 9: google.protobuf.Duration
 }
 var file_spec_proto_depIdxs = []int32{
 	1,  // 0: tunnel.v1.TunnelSpec.ssh:type_name -> tunnel.v1.SSHSpec
 	3,  // 1: tunnel.v1.TunnelSpec.kubectl:type_name -> tunnel.v1.KubectlSpec
 	5,  // 2: tunnel.v1.TunnelSpec.health:type_name -> tunnel.v1.HealthCheckSpec
 	6,  // 3: tunnel.v1.TunnelSpec.restart:type_name -> tunnel.v1.RestartPolicySpec
-	8,  // 4: tunnel.v1.TunnelSpec.startup_timeout:type_name -> google.protobuf.Duration
-	8,  // 5: tunnel.v1.TunnelSpec.shutdown_timeout:type_name -> google.protobuf.Duration
+	9,  // 4: tunnel.v1.TunnelSpec.startup_timeout:type_name -> google.protobuf.Duration
+	9,  // 5: tunnel.v1.TunnelSpec.shutdown_timeout:type_name -> google.protobuf.Duration
 	2,  // 6: tunnel.v1.SSHSpec.local_forwards:type_name -> tunnel.v1.SSHForward
-	7,  // 7: tunnel.v1.SSHSpec.options:type_name -> tunnel.v1.SSHSpec.OptionsEntry
+	8,  // 7: tunnel.v1.SSHSpec.options:type_name -> tunnel.v1.SSHSpec.OptionsEntry
 	4,  // 8: tunnel.v1.KubectlSpec.forwards:type_name -> tunnel.v1.KubectlForward
-	8,  // 9: tunnel.v1.HealthCheckSpec.interval:type_name -> google.protobuf.Duration
-	8,  // 10: tunnel.v1.HealthCheckSpec.timeout:type_name -> google.protobuf.Duration
-	8,  // 11: tunnel.v1.HealthCheckSpec.startup_timeout:type_name -> google.protobuf.Duration
-	8,  // 12: tunnel.v1.RestartPolicySpec.delay:type_name -> google.protobuf.Duration
+	9,  // 9: tunnel.v1.HealthCheckSpec.interval:type_name -> google.protobuf.Duration
+	9,  // 10: tunnel.v1.HealthCheckSpec.timeout:type_name -> google.protobuf.Duration
+	9,  // 11: tunnel.v1.HealthCheckSpec.startup_timeout:type_name -> google.protobuf.Duration
+	9,  // 12: tunnel.v1.RestartPolicySpec.delay:type_name -> google.protobuf.Duration
 	13, // [13:13] is the sub-list for method output_type
 	13, // [13:13] is the sub-list for method input_type
 	13, // [13:13] is the sub-list for extension type_name
@@ -715,7 +791,7 @@ func file_spec_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_spec_proto_rawDesc), len(file_spec_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -27,6 +27,19 @@ func NewTunnelServer(supervisor *daemon.Supervisor) *TunnelServer {
 	}
 }
 
+func toProtoResolvedForwards(ms []tunnel.PortMapping) []*pb.ResolvedForward {
+	out := make([]*pb.ResolvedForward, len(ms))
+	for i, m := range ms {
+		out[i] = &pb.ResolvedForward{
+			LocalAddress:   m.LocalAddress,
+			ConfiguredPort: m.ConfiguredPort,
+			ActualPort:     m.ActualPort,
+			RemotePort:     m.RemotePort,
+		}
+	}
+	return out
+}
+
 func (s *TunnelServer) Status(ctx context.Context, req *pb.StatusRequest) (*pb.StatusResponse, error) {
 	infos := s.supervisor.ListTunnels()
 	var tunnels []*pb.TunnelStatus
@@ -36,10 +49,11 @@ func (s *TunnelServer) Status(ctx context.Context, req *pb.StatusRequest) (*pb.S
 			continue
 		}
 		tunnels = append(tunnels, &pb.TunnelStatus{
-			Name:   info.Name,
-			Status: string(info.Status),
-			Spec:   info.Spec.ToProto(),
-			Error:  info.Error,
+			Name:             info.Name,
+			Status:           string(info.Status),
+			Spec:             info.Spec.ToProto(),
+			Error:            info.Error,
+			ResolvedForwards: toProtoResolvedForwards(info.PortMappings),
 		})
 	}
 
@@ -135,7 +149,12 @@ func (s *TunnelServer) Wait(ctx context.Context, req *pb.WaitRequest) (*pb.WaitR
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	return &pb.WaitResponse{Status: string(st)}, nil
+	var fwds []*pb.ResolvedForward
+	if p, perr := s.supervisor.GetProcess(req.Name); perr == nil {
+		fwds = toProtoResolvedForwards(p.PortMappings())
+	}
+
+	return &pb.WaitResponse{Status: string(st), ResolvedForwards: fwds}, nil
 }
 
 func (s *TunnelServer) Create(ctx context.Context, req *pb.CreateRequest) (*pb.CreateResponse, error) {

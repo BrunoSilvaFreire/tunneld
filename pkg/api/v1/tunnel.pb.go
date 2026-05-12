@@ -22,13 +22,14 @@ const (
 )
 
 type TunnelStatus struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	Spec          *TunnelSpec            `protobuf:"bytes,3,opt,name=spec,proto3" json:"spec,omitempty"`
-	Error         string                 `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Name             string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Status           string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	Spec             *TunnelSpec            `protobuf:"bytes,3,opt,name=spec,proto3" json:"spec,omitempty"`
+	Error            string                 `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
+	ResolvedForwards []*ResolvedForward     `protobuf:"bytes,5,rep,name=resolved_forwards,json=resolvedForwards,proto3" json:"resolved_forwards,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *TunnelStatus) Reset() {
@@ -87,6 +88,13 @@ func (x *TunnelStatus) GetError() string {
 		return x.Error
 	}
 	return ""
+}
+
+func (x *TunnelStatus) GetResolvedForwards() []*ResolvedForward {
+	if x != nil {
+		return x.ResolvedForwards
+	}
+	return nil
 }
 
 type LogsRequest struct {
@@ -486,10 +494,11 @@ func (x *WaitRequest) GetTimeoutSeconds() int64 {
 }
 
 type WaitResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Status           string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	ResolvedForwards []*ResolvedForward     `protobuf:"bytes,2,rep,name=resolved_forwards,json=resolvedForwards,proto3" json:"resolved_forwards,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *WaitResponse) Reset() {
@@ -527,6 +536,13 @@ func (x *WaitResponse) GetStatus() string {
 		return x.Status
 	}
 	return ""
+}
+
+func (x *WaitResponse) GetResolvedForwards() []*ResolvedForward {
+	if x != nil {
+		return x.ResolvedForwards
+	}
+	return nil
 }
 
 type CreateRequest struct {
@@ -1110,12 +1126,13 @@ var File_tunnel_proto protoreflect.FileDescriptor
 const file_tunnel_proto_rawDesc = "" +
 	"\n" +
 	"\ftunnel.proto\x12\ttunnel.v1\x1a\n" +
-	"spec.proto\"{\n" +
+	"spec.proto\"\xc4\x01\n" +
 	"\fTunnelStatus\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12)\n" +
 	"\x04spec\x18\x03 \x01(\v2\x15.tunnel.v1.TunnelSpecR\x04spec\x12\x14\n" +
-	"\x05error\x18\x04 \x01(\tR\x05error\"9\n" +
+	"\x05error\x18\x04 \x01(\tR\x05error\x12G\n" +
+	"\x11resolved_forwards\x18\x05 \x03(\v2\x1a.tunnel.v1.ResolvedForwardR\x10resolvedForwards\"9\n" +
 	"\vLogsRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
 	"\x06follow\x18\x02 \x01(\bR\x06follow\"\"\n" +
@@ -1133,9 +1150,10 @@ const file_tunnel_proto_rawDesc = "" +
 	"\fStopResponse\"J\n" +
 	"\vWaitRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12'\n" +
-	"\x0ftimeout_seconds\x18\x02 \x01(\x03R\x0etimeoutSeconds\"&\n" +
+	"\x0ftimeout_seconds\x18\x02 \x01(\x03R\x0etimeoutSeconds\"o\n" +
 	"\fWaitResponse\x12\x16\n" +
-	"\x06status\x18\x01 \x01(\tR\x06status\"\xc4\x01\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12G\n" +
+	"\x11resolved_forwards\x18\x02 \x03(\v2\x1a.tunnel.v1.ResolvedForwardR\x10resolvedForwards\"\xc4\x01\n" +
 	"\rCreateRequest\x12)\n" +
 	"\x04spec\x18\x01 \x01(\v2\x15.tunnel.v1.TunnelSpecR\x04spec\x12I\n" +
 	"\vinline_keys\x18\x02 \x03(\v2(.tunnel.v1.CreateRequest.InlineKeysEntryR\n" +
@@ -1220,41 +1238,44 @@ var file_tunnel_proto_goTypes = []any{
 	(*DeleteKeyResponse)(nil), // 24: tunnel.v1.DeleteKeyResponse
 	nil,                       // 25: tunnel.v1.CreateRequest.InlineKeysEntry
 	(*TunnelSpec)(nil),        // 26: tunnel.v1.TunnelSpec
+	(*ResolvedForward)(nil),   // 27: tunnel.v1.ResolvedForward
 }
 var file_tunnel_proto_depIdxs = []int32{
 	26, // 0: tunnel.v1.TunnelStatus.spec:type_name -> tunnel.v1.TunnelSpec
-	0,  // 1: tunnel.v1.StatusResponse.tunnels:type_name -> tunnel.v1.TunnelStatus
-	26, // 2: tunnel.v1.CreateRequest.spec:type_name -> tunnel.v1.TunnelSpec
-	25, // 3: tunnel.v1.CreateRequest.inline_keys:type_name -> tunnel.v1.CreateRequest.InlineKeysEntry
-	3,  // 4: tunnel.v1.TunnelService.Status:input_type -> tunnel.v1.StatusRequest
-	5,  // 5: tunnel.v1.TunnelService.Start:input_type -> tunnel.v1.StartRequest
-	7,  // 6: tunnel.v1.TunnelService.Stop:input_type -> tunnel.v1.StopRequest
-	9,  // 7: tunnel.v1.TunnelService.Wait:input_type -> tunnel.v1.WaitRequest
-	11, // 8: tunnel.v1.TunnelService.Create:input_type -> tunnel.v1.CreateRequest
-	13, // 9: tunnel.v1.TunnelService.Delete:input_type -> tunnel.v1.DeleteRequest
-	1,  // 10: tunnel.v1.TunnelService.Logs:input_type -> tunnel.v1.LogsRequest
-	15, // 11: tunnel.v1.TunnelService.Enable:input_type -> tunnel.v1.EnableRequest
-	17, // 12: tunnel.v1.TunnelService.Disable:input_type -> tunnel.v1.DisableRequest
-	19, // 13: tunnel.v1.KeyService.AddKey:input_type -> tunnel.v1.AddKeyRequest
-	21, // 14: tunnel.v1.KeyService.ListKeys:input_type -> tunnel.v1.ListKeysRequest
-	23, // 15: tunnel.v1.KeyService.DeleteKey:input_type -> tunnel.v1.DeleteKeyRequest
-	4,  // 16: tunnel.v1.TunnelService.Status:output_type -> tunnel.v1.StatusResponse
-	6,  // 17: tunnel.v1.TunnelService.Start:output_type -> tunnel.v1.StartResponse
-	8,  // 18: tunnel.v1.TunnelService.Stop:output_type -> tunnel.v1.StopResponse
-	10, // 19: tunnel.v1.TunnelService.Wait:output_type -> tunnel.v1.WaitResponse
-	12, // 20: tunnel.v1.TunnelService.Create:output_type -> tunnel.v1.CreateResponse
-	14, // 21: tunnel.v1.TunnelService.Delete:output_type -> tunnel.v1.DeleteResponse
-	2,  // 22: tunnel.v1.TunnelService.Logs:output_type -> tunnel.v1.LogsResponse
-	16, // 23: tunnel.v1.TunnelService.Enable:output_type -> tunnel.v1.EnableResponse
-	18, // 24: tunnel.v1.TunnelService.Disable:output_type -> tunnel.v1.DisableResponse
-	20, // 25: tunnel.v1.KeyService.AddKey:output_type -> tunnel.v1.AddKeyResponse
-	22, // 26: tunnel.v1.KeyService.ListKeys:output_type -> tunnel.v1.ListKeysResponse
-	24, // 27: tunnel.v1.KeyService.DeleteKey:output_type -> tunnel.v1.DeleteKeyResponse
-	16, // [16:28] is the sub-list for method output_type
-	4,  // [4:16] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	27, // 1: tunnel.v1.TunnelStatus.resolved_forwards:type_name -> tunnel.v1.ResolvedForward
+	0,  // 2: tunnel.v1.StatusResponse.tunnels:type_name -> tunnel.v1.TunnelStatus
+	27, // 3: tunnel.v1.WaitResponse.resolved_forwards:type_name -> tunnel.v1.ResolvedForward
+	26, // 4: tunnel.v1.CreateRequest.spec:type_name -> tunnel.v1.TunnelSpec
+	25, // 5: tunnel.v1.CreateRequest.inline_keys:type_name -> tunnel.v1.CreateRequest.InlineKeysEntry
+	3,  // 6: tunnel.v1.TunnelService.Status:input_type -> tunnel.v1.StatusRequest
+	5,  // 7: tunnel.v1.TunnelService.Start:input_type -> tunnel.v1.StartRequest
+	7,  // 8: tunnel.v1.TunnelService.Stop:input_type -> tunnel.v1.StopRequest
+	9,  // 9: tunnel.v1.TunnelService.Wait:input_type -> tunnel.v1.WaitRequest
+	11, // 10: tunnel.v1.TunnelService.Create:input_type -> tunnel.v1.CreateRequest
+	13, // 11: tunnel.v1.TunnelService.Delete:input_type -> tunnel.v1.DeleteRequest
+	1,  // 12: tunnel.v1.TunnelService.Logs:input_type -> tunnel.v1.LogsRequest
+	15, // 13: tunnel.v1.TunnelService.Enable:input_type -> tunnel.v1.EnableRequest
+	17, // 14: tunnel.v1.TunnelService.Disable:input_type -> tunnel.v1.DisableRequest
+	19, // 15: tunnel.v1.KeyService.AddKey:input_type -> tunnel.v1.AddKeyRequest
+	21, // 16: tunnel.v1.KeyService.ListKeys:input_type -> tunnel.v1.ListKeysRequest
+	23, // 17: tunnel.v1.KeyService.DeleteKey:input_type -> tunnel.v1.DeleteKeyRequest
+	4,  // 18: tunnel.v1.TunnelService.Status:output_type -> tunnel.v1.StatusResponse
+	6,  // 19: tunnel.v1.TunnelService.Start:output_type -> tunnel.v1.StartResponse
+	8,  // 20: tunnel.v1.TunnelService.Stop:output_type -> tunnel.v1.StopResponse
+	10, // 21: tunnel.v1.TunnelService.Wait:output_type -> tunnel.v1.WaitResponse
+	12, // 22: tunnel.v1.TunnelService.Create:output_type -> tunnel.v1.CreateResponse
+	14, // 23: tunnel.v1.TunnelService.Delete:output_type -> tunnel.v1.DeleteResponse
+	2,  // 24: tunnel.v1.TunnelService.Logs:output_type -> tunnel.v1.LogsResponse
+	16, // 25: tunnel.v1.TunnelService.Enable:output_type -> tunnel.v1.EnableResponse
+	18, // 26: tunnel.v1.TunnelService.Disable:output_type -> tunnel.v1.DisableResponse
+	20, // 27: tunnel.v1.KeyService.AddKey:output_type -> tunnel.v1.AddKeyResponse
+	22, // 28: tunnel.v1.KeyService.ListKeys:output_type -> tunnel.v1.ListKeysResponse
+	24, // 29: tunnel.v1.KeyService.DeleteKey:output_type -> tunnel.v1.DeleteKeyResponse
+	18, // [18:30] is the sub-list for method output_type
+	6,  // [6:18] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_tunnel_proto_init() }

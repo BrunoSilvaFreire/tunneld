@@ -29,6 +29,13 @@ var waitCmd = &cobra.Command{
 			log.Fatalf("wait failed: %v", err)
 		}
 		fmt.Printf("Tunnel %q is %s\n", name, resp.Status)
+		for _, f := range resp.ResolvedForwards {
+			suffix := ""
+			if f.ConfiguredPort == 0 {
+				suffix = " (dynamic)"
+			}
+			fmt.Printf("  %s:%d → :%d%s\n", f.LocalAddress, f.ActualPort, f.RemotePort, suffix)
+		}
 	},
 }
 

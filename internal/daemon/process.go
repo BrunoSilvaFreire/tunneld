@@ -5,13 +5,17 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/BrunoSilvaFreire/tunneld/internal/tunnel"
+	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 type Process struct {
@@ -25,6 +29,7 @@ type Process struct {
 	logPath       string
 	expectedState string
 	keyDir        string
+	portMappings  []tunnel.PortMapping
 }
 
 func NewProcess(spec tunnel.Spec, keyDir string) *Process {
@@ -98,7 +103,23 @@ func (p *Process) Start(ctx context.Context) error {
 	runCtx, cancel := context.WithCancel(ctx)
 	p.cancel = cancel
 
-	cmd, err := p.spec.BuildCommand(runCtx, p.keyDir)
+	resolvedProto, mappings, err := tunnel.ResolvePortsInProto(p.spec.ToProto())
+	if err != nil {
+		logFile.Close()
+		cancel()
+		return fmt.Errorf("resolve ports: %w", err)
+	}
+	p.mu.Lock()
+	p.portMappings = mappings
+	p.mu.Unlock()
+
+	resolvedSpec, err := tunnel.FromProto(resolvedProto)
+	if err != nil {
+		logFile.Close()
+		cancel()
+		return fmt.Errorf("build resolved spec: %w", err)
+	}
+	cmd, err := resolvedSpec.BuildCommand(runCtx, p.keyDir)
 	if err != nil {
 		logFile.Close()
 		cancel()
@@ -185,6 +206,36 @@ func (p *Process) IsProcessAlive() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.cmd != nil && p.cmd.Process != nil && p.cmd.ProcessState == nil
+}
+
+func (p *Process) PortMappings() []tunnel.PortMapping {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.portMappings
+}
+
+// EffectiveHealthCheck returns the health check spec with any port=0 address
+// updated to the actual OS-assigned port after dynamic allocation.
+func (p *Process) EffectiveHealthCheck() *pb.HealthCheckSpec {
+	h := p.spec.HealthCheck()
+	if h == nil || h.Address == "" {
+		return h
+	}
+	host, portStr, err := net.SplitHostPort(h.Address)
+	if err != nil || portStr != "0" {
+		return h
+	}
+	p.mu.RLock()
+	mappings := p.portMappings
+	p.mu.RUnlock()
+	for _, m := range mappings {
+		if m.LocalAddress == host && m.ConfiguredPort == 0 {
+			hCopy := proto.Clone(h).(*pb.HealthCheckSpec)
+			hCopy.Address = net.JoinHostPort(host, strconv.Itoa(int(m.ActualPort)))
+			return hCopy
+		}
+	}
+	return h
 }
 
 func (p *Process) streamLogs(r io.Reader, label string, logger *log.Logger) {

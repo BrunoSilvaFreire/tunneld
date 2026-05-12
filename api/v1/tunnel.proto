@@ -23,6 +23,7 @@ message TunnelStatus {
   string status = 2;
   TunnelSpec spec = 3;
   string error = 4;
+  repeated ResolvedForward resolved_forwards = 5;
 }
 
 message LogsRequest {
@@ -61,6 +62,7 @@ message WaitRequest {
 
 message WaitResponse {
   string status = 1;
+  repeated ResolvedForward resolved_forwards = 2;
 }
 
 message CreateRequest {

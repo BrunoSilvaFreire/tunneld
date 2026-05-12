@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
 	"github.com/spf13/cobra"
@@ -24,7 +25,7 @@ var statusCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("could not get status: %v", err)
 		}
-		fmt.Printf("%-20s %-10s %-10s %-20s %s\n", "NAME", "TYPE", "STATUS", "ERROR", "DEPENDENCIES")
+		fmt.Printf("%-20s %-10s %-10s %-25s %-20s %s\n", "NAME", "TYPE", "STATUS", "PORTS", "ERROR", "DEPENDENCIES")
 		for _, t := range resp.Tunnels {
 			typeStr := "unknown"
 			deps := []string{}
@@ -36,7 +37,16 @@ var statusCmd = &cobra.Command{
 					typeStr = "kubectl"
 				}
 			}
-			fmt.Printf("%-20s %-10s %-10s %-20s %v\n", t.Name, typeStr, t.Status, t.Error, deps)
+			var portParts []string
+			for _, f := range t.ResolvedForwards {
+				part := fmt.Sprintf("%s:%d", f.LocalAddress, f.ActualPort)
+				if f.ConfiguredPort == 0 {
+					part += "*"
+				}
+				portParts = append(portParts, part)
+			}
+			portsStr := strings.Join(portParts, ",")
+			fmt.Printf("%-20s %-10s %-10s %-25s %-20s %v\n", t.Name, typeStr, t.Status, portsStr, t.Error, deps)
 		}
 	},
 }
