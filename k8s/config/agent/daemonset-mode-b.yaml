@@ -1,0 +1,65 @@
+# Mode B: tunneld runs as a sidecar in the agent pod. Pod uses hostNetwork so
+# tunnel ports bind on the node IP and are reachable by the cluster Service.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: tunneld-agent
+  namespace: tunneld-system
+  labels:
+    app.kubernetes.io/name: tunneld-agent
+    tunneld.io/mode: daemonset
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tunneld-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tunneld-agent
+    spec:
+      serviceAccountName: tunneld-agent
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: tunneld
+          image: ghcr.io/brunosilvafreire/tunneld:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - run
+            - --socket=/run/tunneld/tunneld.sock
+            - --no-config        # all tunnels come from CRs; ignore /etc/tunneld/tunnels.yaml
+          volumeMounts:
+            - { name: tunneld-socket, mountPath: /run/tunneld }
+            - { name: tunneld-keys,   mountPath: /var/lib/tunneld/keys }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+        - name: agent
+          image: ghcr.io/brunosilvafreire/tunneld-agent:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - --socket=/run/tunneld/tunneld.sock
+          env:
+            - name: NODE_NAME
+              valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+          volumeMounts:
+            - { name: tunneld-socket, mountPath: /run/tunneld }
+          ports:
+            - { name: metrics, containerPort: 8080 }
+            - { name: probes,  containerPort: 8081 }
+          livenessProbe:  { httpGet: { path: /healthz, port: probes }, initialDelaySeconds: 15, periodSeconds: 20 }
+          readinessProbe: { httpGet: { path: /readyz,  port: probes }, initialDelaySeconds: 5,  periodSeconds: 10 }
+          resources:
+            requests: { cpu: 25m, memory: 32Mi }
+            limits:   { cpu: 200m, memory: 128Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+      volumes:
+        - name: tunneld-socket
+          emptyDir: {}
+        - name: tunneld-keys
+          emptyDir: {}

@@ -153,15 +153,16 @@ func (*TunnelSpec_Ssh) isTunnelSpec_Type() {}
 func (*TunnelSpec_Kubectl) isTunnelSpec_Type() {}
 
 type SSHSpec struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	User          string                 `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
-	Host          string                 `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
-	Port          int32                  `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"`
-	IdentityKey   string                 `protobuf:"bytes,4,opt,name=identity_key,json=identityKey,proto3" json:"identity_key,omitempty"`
-	LocalForwards []*SSHForward          `protobuf:"bytes,5,rep,name=local_forwards,json=localForwards,proto3" json:"local_forwards,omitempty"`
-	Options       map[string]string      `protobuf:"bytes,6,rep,name=options,proto3" json:"options,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	User            string                 `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	Host            string                 `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
+	Port            int32                  `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"`
+	IdentityKeyFile string                 `protobuf:"bytes,4,opt,name=identity_key_file,json=identityKeyFile,proto3" json:"identity_key_file,omitempty"`
+	LocalForwards   []*SSHForward          `protobuf:"bytes,5,rep,name=local_forwards,json=localForwards,proto3" json:"local_forwards,omitempty"`
+	Options         map[string]string      `protobuf:"bytes,6,rep,name=options,proto3" json:"options,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	IdentityKeyRef  string                 `protobuf:"bytes,7,opt,name=identity_key_ref,json=identityKeyRef,proto3" json:"identity_key_ref,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *SSHSpec) Reset() {
@@ -215,9 +216,9 @@ func (x *SSHSpec) GetPort() int32 {
 	return 0
 }
 
-func (x *SSHSpec) GetIdentityKey() string {
+func (x *SSHSpec) GetIdentityKeyFile() string {
 	if x != nil {
-		return x.IdentityKey
+		return x.IdentityKeyFile
 	}
 	return ""
 }
@@ -234,6 +235,13 @@ func (x *SSHSpec) GetOptions() map[string]string {
 		return x.Options
 	}
 	return nil
+}
+
+func (x *SSHSpec) GetIdentityKeyRef() string {
+	if x != nil {
+		return x.IdentityKeyRef
+	}
+	return ""
 }
 
 type SSHForward struct {
@@ -306,13 +314,14 @@ func (x *SSHForward) GetTargetPort() int32 {
 
 type KubectlSpec struct {
 	state                 protoimpl.MessageState `protogen:"open.v1"`
-	KubeconfigKey         string                 `protobuf:"bytes,1,opt,name=kubeconfig_key,json=kubeconfigKey,proto3" json:"kubeconfig_key,omitempty"`
+	KubeconfigRef         string                 `protobuf:"bytes,1,opt,name=kubeconfig_ref,json=kubeconfigRef,proto3" json:"kubeconfig_ref,omitempty"`
 	Context               string                 `protobuf:"bytes,2,opt,name=context,proto3" json:"context,omitempty"`
 	Namespace             string                 `protobuf:"bytes,3,opt,name=namespace,proto3" json:"namespace,omitempty"`
 	Resource              string                 `protobuf:"bytes,4,opt,name=resource,proto3" json:"resource,omitempty"`
 	Forwards              []*KubectlForward      `protobuf:"bytes,5,rep,name=forwards,proto3" json:"forwards,omitempty"`
 	ApiServer             string                 `protobuf:"bytes,6,opt,name=api_server,json=apiServer,proto3" json:"api_server,omitempty"`
 	InsecureSkipTlsVerify bool                   `protobuf:"varint,7,opt,name=insecure_skip_tls_verify,json=insecureSkipTlsVerify,proto3" json:"insecure_skip_tls_verify,omitempty"`
+	KubeconfigFile        string                 `protobuf:"bytes,8,opt,name=kubeconfig_file,json=kubeconfigFile,proto3" json:"kubeconfig_file,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -347,9 +356,9 @@ func (*KubectlSpec) Descriptor() ([]byte, []int) {
 	return file_spec_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *KubectlSpec) GetKubeconfigKey() string {
+func (x *KubectlSpec) GetKubeconfigRef() string {
 	if x != nil {
-		return x.KubeconfigKey
+		return x.KubeconfigRef
 	}
 	return ""
 }
@@ -394,6 +403,13 @@ func (x *KubectlSpec) GetInsecureSkipTlsVerify() bool {
 		return x.InsecureSkipTlsVerify
 	}
 	return false
+}
+
+func (x *KubectlSpec) GetKubeconfigFile() string {
+	if x != nil {
+		return x.KubeconfigFile
+	}
+	return ""
 }
 
 type KubectlForward struct {
@@ -532,18 +548,71 @@ func (x *HealthCheckSpec) GetStartupTimeout() *durationpb.Duration {
 	return nil
 }
 
+type BackoffSpec struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Multiplier    float32                `protobuf:"fixed32,1,opt,name=multiplier,proto3" json:"multiplier,omitempty"`
+	MaxDelay      *durationpb.Duration   `protobuf:"bytes,2,opt,name=max_delay,json=maxDelay,proto3" json:"max_delay,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BackoffSpec) Reset() {
+	*x = BackoffSpec{}
+	mi := &file_spec_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BackoffSpec) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BackoffSpec) ProtoMessage() {}
+
+func (x *BackoffSpec) ProtoReflect() protoreflect.Message {
+	mi := &file_spec_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BackoffSpec.ProtoReflect.Descriptor instead.
+func (*BackoffSpec) Descriptor() ([]byte, []int) {
+	return file_spec_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *BackoffSpec) GetMultiplier() float32 {
+	if x != nil {
+		return x.Multiplier
+	}
+	return 0
+}
+
+func (x *BackoffSpec) GetMaxDelay() *durationpb.Duration {
+	if x != nil {
+		return x.MaxDelay
+	}
+	return nil
+}
+
 type RestartPolicySpec struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Policy        string                 `protobuf:"bytes,1,opt,name=policy,proto3" json:"policy,omitempty"` // always, on-failure, never
 	Delay         *durationpb.Duration   `protobuf:"bytes,2,opt,name=delay,proto3" json:"delay,omitempty"`
 	MaxAttempts   int32                  `protobuf:"varint,3,opt,name=max_attempts,json=maxAttempts,proto3" json:"max_attempts,omitempty"`
+	Backoff       *BackoffSpec           `protobuf:"bytes,4,opt,name=backoff,proto3" json:"backoff,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RestartPolicySpec) Reset() {
 	*x = RestartPolicySpec{}
-	mi := &file_spec_proto_msgTypes[6]
+	mi := &file_spec_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -555,7 +624,7 @@ func (x *RestartPolicySpec) String() string {
 func (*RestartPolicySpec) ProtoMessage() {}
 
 func (x *RestartPolicySpec) ProtoReflect() protoreflect.Message {
-	mi := &file_spec_proto_msgTypes[6]
+	mi := &file_spec_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -568,7 +637,7 @@ func (x *RestartPolicySpec) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RestartPolicySpec.ProtoReflect.Descriptor instead.
 func (*RestartPolicySpec) Descriptor() ([]byte, []int) {
-	return file_spec_proto_rawDescGZIP(), []int{6}
+	return file_spec_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *RestartPolicySpec) GetPolicy() string {
@@ -592,6 +661,13 @@ func (x *RestartPolicySpec) GetMaxAttempts() int32 {
 	return 0
 }
 
+func (x *RestartPolicySpec) GetBackoff() *BackoffSpec {
+	if x != nil {
+		return x.Backoff
+	}
+	return nil
+}
+
 type ResolvedForward struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	LocalAddress   string                 `protobuf:"bytes,1,opt,name=local_address,json=localAddress,proto3" json:"local_address,omitempty"`
@@ -604,7 +680,7 @@ type ResolvedForward struct {
 
 func (x *ResolvedForward) Reset() {
 	*x = ResolvedForward{}
-	mi := &file_spec_proto_msgTypes[7]
+	mi := &file_spec_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -616,7 +692,7 @@ func (x *ResolvedForward) String() string {
 func (*ResolvedForward) ProtoMessage() {}
 
 func (x *ResolvedForward) ProtoReflect() protoreflect.Message {
-	mi := &file_spec_proto_msgTypes[7]
+	mi := &file_spec_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -629,7 +705,7 @@ func (x *ResolvedForward) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolvedForward.ProtoReflect.Descriptor instead.
 func (*ResolvedForward) Descriptor() ([]byte, []int) {
-	return file_spec_proto_rawDescGZIP(), []int{7}
+	return file_spec_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ResolvedForward) GetLocalAddress() string {
@@ -677,14 +753,15 @@ const file_spec_proto_rawDesc = "" +
 	"\arestart\x18\x06 \x01(\v2\x1c.tunnel.v1.RestartPolicySpecR\arestart\x12B\n" +
 	"\x0fstartup_timeout\x18\a \x01(\v2\x19.google.protobuf.DurationR\x0estartupTimeout\x12D\n" +
 	"\x10shutdown_timeout\x18\b \x01(\v2\x19.google.protobuf.DurationR\x0fshutdownTimeoutB\x06\n" +
-	"\x04type\"\x9d\x02\n" +
+	"\x04type\"\xd0\x02\n" +
 	"\aSSHSpec\x12\x12\n" +
 	"\x04user\x18\x01 \x01(\tR\x04user\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x12\x12\n" +
-	"\x04port\x18\x03 \x01(\x05R\x04port\x12!\n" +
-	"\fidentity_key\x18\x04 \x01(\tR\videntityKey\x12<\n" +
+	"\x04port\x18\x03 \x01(\x05R\x04port\x12*\n" +
+	"\x11identity_key_file\x18\x04 \x01(\tR\x0fidentityKeyFile\x12<\n" +
 	"\x0elocal_forwards\x18\x05 \x03(\v2\x15.tunnel.v1.SSHForwardR\rlocalForwards\x129\n" +
-	"\aoptions\x18\x06 \x03(\v2\x1f.tunnel.v1.SSHSpec.OptionsEntryR\aoptions\x1a:\n" +
+	"\aoptions\x18\x06 \x03(\v2\x1f.tunnel.v1.SSHSpec.OptionsEntryR\aoptions\x12(\n" +
+	"\x10identity_key_ref\x18\a \x01(\tR\x0eidentityKeyRef\x1a:\n" +
 	"\fOptionsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x96\x01\n" +
@@ -696,16 +773,17 @@ const file_spec_proto_rawDesc = "" +
 	"\vtarget_host\x18\x03 \x01(\tR\n" +
 	"targetHost\x12\x1f\n" +
 	"\vtarget_port\x18\x04 \x01(\x05R\n" +
-	"targetPort\"\x97\x02\n" +
+	"targetPort\"\xc0\x02\n" +
 	"\vKubectlSpec\x12%\n" +
-	"\x0ekubeconfig_key\x18\x01 \x01(\tR\rkubeconfigKey\x12\x18\n" +
+	"\x0ekubeconfig_ref\x18\x01 \x01(\tR\rkubeconfigRef\x12\x18\n" +
 	"\acontext\x18\x02 \x01(\tR\acontext\x12\x1c\n" +
 	"\tnamespace\x18\x03 \x01(\tR\tnamespace\x12\x1a\n" +
 	"\bresource\x18\x04 \x01(\tR\bresource\x125\n" +
 	"\bforwards\x18\x05 \x03(\v2\x19.tunnel.v1.KubectlForwardR\bforwards\x12\x1d\n" +
 	"\n" +
 	"api_server\x18\x06 \x01(\tR\tapiServer\x127\n" +
-	"\x18insecure_skip_tls_verify\x18\a \x01(\bR\x15insecureSkipTlsVerify\"u\n" +
+	"\x18insecure_skip_tls_verify\x18\a \x01(\bR\x15insecureSkipTlsVerify\x12'\n" +
+	"\x0fkubeconfig_file\x18\b \x01(\tR\x0ekubeconfigFile\"u\n" +
 	"\x0eKubectlForward\x12#\n" +
 	"\rlocal_address\x18\x01 \x01(\tR\flocalAddress\x12\x1d\n" +
 	"\n" +
@@ -717,11 +795,17 @@ const file_spec_proto_rawDesc = "" +
 	"\aaddress\x18\x02 \x01(\tR\aaddress\x125\n" +
 	"\binterval\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\binterval\x123\n" +
 	"\atimeout\x18\x04 \x01(\v2\x19.google.protobuf.DurationR\atimeout\x12B\n" +
-	"\x0fstartup_timeout\x18\x05 \x01(\v2\x19.google.protobuf.DurationR\x0estartupTimeout\"\x7f\n" +
+	"\x0fstartup_timeout\x18\x05 \x01(\v2\x19.google.protobuf.DurationR\x0estartupTimeout\"e\n" +
+	"\vBackoffSpec\x12\x1e\n" +
+	"\n" +
+	"multiplier\x18\x01 \x01(\x02R\n" +
+	"multiplier\x126\n" +
+	"\tmax_delay\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\bmaxDelay\"\xb1\x01\n" +
 	"\x11RestartPolicySpec\x12\x16\n" +
 	"\x06policy\x18\x01 \x01(\tR\x06policy\x12/\n" +
 	"\x05delay\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\x05delay\x12!\n" +
-	"\fmax_attempts\x18\x03 \x01(\x05R\vmaxAttempts\"\xa1\x01\n" +
+	"\fmax_attempts\x18\x03 \x01(\x05R\vmaxAttempts\x120\n" +
+	"\abackoff\x18\x04 \x01(\v2\x16.tunnel.v1.BackoffSpecR\abackoff\"\xa1\x01\n" +
 	"\x0fResolvedForward\x12#\n" +
 	"\rlocal_address\x18\x01 \x01(\tR\flocalAddress\x12'\n" +
 	"\x0fconfigured_port\x18\x02 \x01(\x05R\x0econfiguredPort\x12\x1f\n" +
@@ -742,7 +826,7 @@ func file_spec_proto_rawDescGZIP() []byte {
 	return file_spec_proto_rawDescData
 }
 
-var file_spec_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_spec_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_spec_proto_goTypes = []any{
 	(*TunnelSpec)(nil),          // 0: tunnel.v1.TunnelSpec
 	(*SSHSpec)(nil),             // 1: tunnel.v1.SSHSpec
@@ -750,30 +834,33 @@ var file_spec_proto_goTypes = []any{
 	(*KubectlSpec)(nil),         // 3: tunnel.v1.KubectlSpec
 	(*KubectlForward)(nil),      // 4: tunnel.v1.KubectlForward
 	(*HealthCheckSpec)(nil),     // 5: tunnel.v1.HealthCheckSpec
-	(*RestartPolicySpec)(nil),   // 6: tunnel.v1.RestartPolicySpec
-	(*ResolvedForward)(nil),     // 7: tunnel.v1.ResolvedForward
-	nil,                         // 8: tunnel.v1.SSHSpec.OptionsEntry
-	(*durationpb.Duration)(nil), // 9: google.protobuf.Duration
+	(*BackoffSpec)(nil),         // 6: tunnel.v1.BackoffSpec
+	(*RestartPolicySpec)(nil),   // 7: tunnel.v1.RestartPolicySpec
+	(*ResolvedForward)(nil),     // 8: tunnel.v1.ResolvedForward
+	nil,                         // 9: tunnel.v1.SSHSpec.OptionsEntry
+	(*durationpb.Duration)(nil), // 10: google.protobuf.Duration
 }
 var file_spec_proto_depIdxs = []int32{
 	1,  // 0: tunnel.v1.TunnelSpec.ssh:type_name -> tunnel.v1.SSHSpec
 	3,  // 1: tunnel.v1.TunnelSpec.kubectl:type_name -> tunnel.v1.KubectlSpec
 	5,  // 2: tunnel.v1.TunnelSpec.health:type_name -> tunnel.v1.HealthCheckSpec
-	6,  // 3: tunnel.v1.TunnelSpec.restart:type_name -> tunnel.v1.RestartPolicySpec
-	9,  // 4: tunnel.v1.TunnelSpec.startup_timeout:type_name -> google.protobuf.Duration
-	9,  // 5: tunnel.v1.TunnelSpec.shutdown_timeout:type_name -> google.protobuf.Duration
+	7,  // 3: tunnel.v1.TunnelSpec.restart:type_name -> tunnel.v1.RestartPolicySpec
+	10, // 4: tunnel.v1.TunnelSpec.startup_timeout:type_name -> google.protobuf.Duration
+	10, // 5: tunnel.v1.TunnelSpec.shutdown_timeout:type_name -> google.protobuf.Duration
 	2,  // 6: tunnel.v1.SSHSpec.local_forwards:type_name -> tunnel.v1.SSHForward
-	8,  // 7: tunnel.v1.SSHSpec.options:type_name -> tunnel.v1.SSHSpec.OptionsEntry
+	9,  // 7: tunnel.v1.SSHSpec.options:type_name -> tunnel.v1.SSHSpec.OptionsEntry
 	4,  // 8: tunnel.v1.KubectlSpec.forwards:type_name -> tunnel.v1.KubectlForward
-	9,  // 9: tunnel.v1.HealthCheckSpec.interval:type_name -> google.protobuf.Duration
-	9,  // 10: tunnel.v1.HealthCheckSpec.timeout:type_name -> google.protobuf.Duration
-	9,  // 11: tunnel.v1.HealthCheckSpec.startup_timeout:type_name -> google.protobuf.Duration
-	9,  // 12: tunnel.v1.RestartPolicySpec.delay:type_name -> google.protobuf.Duration
-	13, // [13:13] is the sub-list for method output_type
-	13, // [13:13] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	10, // 9: tunnel.v1.HealthCheckSpec.interval:type_name -> google.protobuf.Duration
+	10, // 10: tunnel.v1.HealthCheckSpec.timeout:type_name -> google.protobuf.Duration
+	10, // 11: tunnel.v1.HealthCheckSpec.startup_timeout:type_name -> google.protobuf.Duration
+	10, // 12: tunnel.v1.BackoffSpec.max_delay:type_name -> google.protobuf.Duration
+	10, // 13: tunnel.v1.RestartPolicySpec.delay:type_name -> google.protobuf.Duration
+	6,  // 14: tunnel.v1.RestartPolicySpec.backoff:type_name -> tunnel.v1.BackoffSpec
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_spec_proto_init() }
@@ -791,7 +878,7 @@ func file_spec_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_spec_proto_rawDesc), len(file_spec_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

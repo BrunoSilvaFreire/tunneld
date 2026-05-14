@@ -1,0 +1,6 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Default to Mode A (host-installed tunneld). Override in an overlay to swap
+# to daemonset-mode-b.yaml when running tunneld as a sidecar.
+resources:
+  - daemonset-mode-a.yaml

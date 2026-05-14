@@ -27,7 +27,7 @@ tunnels:
       user: debian
       host: 1.2.3.4
       port: 2222
-      identity_key: id_ed25519
+      identity_key_ref: id_ed25519
       local_forwards:
         - listen_address: "127.0.0.1"
           listen_port: 16443
@@ -50,7 +50,7 @@ tunnels:
     enabled: true
     type: kubectl
     kubectl:
-      kubeconfig_key: prod-config
+      kubeconfig_ref: prod-config
       context: my-context
       namespace: cityscape
       resource: svc/my-redis
@@ -99,8 +99,8 @@ func TestLoadSSHTunnel(t *testing.T) {
 	if tc.SSH.Port != 2222 {
 		t.Errorf("ssh.port: got %d, want 2222", tc.SSH.Port)
 	}
-	if tc.SSH.IdentityKey != "id_ed25519" {
-		t.Errorf("ssh.identity_key: got %q, want %q", tc.SSH.IdentityKey, "id_ed25519")
+	if tc.SSH.IdentityKeyRef != "id_ed25519" {
+		t.Errorf("ssh.identity_key_ref: got %q, want %q", tc.SSH.IdentityKeyRef, "id_ed25519")
 	}
 	if len(tc.SSH.LocalForwards) != 1 {
 		t.Fatalf("ssh.local_forwards: got %d, want 1", len(tc.SSH.LocalForwards))
@@ -133,8 +133,8 @@ func TestLoadKubectlTunnel(t *testing.T) {
 	if tc.Kubectl == nil {
 		t.Fatal("expected non-nil Kubectl config")
 	}
-	if tc.Kubectl.KubeconfigKey != "prod-config" {
-		t.Errorf("kubeconfig_key: got %q, want %q", tc.Kubectl.KubeconfigKey, "prod-config")
+	if tc.Kubectl.KubeconfigRef != "prod-config" {
+		t.Errorf("kubeconfig_ref: got %q, want %q", tc.Kubectl.KubeconfigRef, "prod-config")
 	}
 	if tc.Kubectl.Context != "my-context" {
 		t.Errorf("context: got %q, want %q", tc.Kubectl.Context, "my-context")
@@ -214,7 +214,7 @@ func TestConfigToSpec_Kubectl(t *testing.T) {
 		Enabled: true,
 		Type:    "kubectl",
 		Kubectl: &KubectlConfig{
-			KubeconfigKey: "prod-config",
+			KubeconfigRef: "prod-config",
 			Context:       "my-context",
 			Namespace:     "cityscape",
 			Resource:      "svc/redis",
@@ -234,7 +234,7 @@ func TestConfigToSpec_Kubectl(t *testing.T) {
 	if proto.GetKubectl() == nil {
 		t.Fatal("ToProto().GetKubectl() returned nil")
 	}
-	if proto.GetKubectl().KubeconfigKey != "prod-config" {
-		t.Errorf("KubeconfigKey: got %q, want %q", proto.GetKubectl().KubeconfigKey, "prod-config")
+	if proto.GetKubectl().KubeconfigRef != "prod-config" {
+		t.Errorf("KubeconfigRef: got %q, want %q", proto.GetKubectl().KubeconfigRef, "prod-config")
 	}
 }

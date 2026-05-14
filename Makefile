@@ -1,7 +1,11 @@
-.PHONY: all build test clean proto package-deb package-zip setup-local setup-remote
+.PHONY: all build test clean proto package-deb package-zip setup-local setup-remote build-k8s generate-k8s image-controller image-agent
 
 BINARY_TUNNELD=tunneld
 BINARY_TUNNELCTL=tunnelctl
+BINARY_CONTROLLER=tunneld-controller
+BINARY_AGENT=tunneld-agent
+IMAGE_REGISTRY ?= ghcr.io/brunosilvafreire
+IMAGE_TAG ?= latest
 VERSION ?= $(shell scripts/get_version.sh)
 GOARCH ?= $(shell go env GOARCH)
 DEB_PACKAGE=$(BINARY_TUNNELD)_$(VERSION)_$(GOARCH).deb
@@ -21,13 +25,36 @@ build:
 	GOARCH=$(GOARCH) go build -o $(BINARY_TUNNELD) ./cmd/tunneld/main.go
 	GOARCH=$(GOARCH) go build -o $(BINARY_TUNNELCTL) ./cmd/tunnelctl/main.go
 
+# Kubernetes operator binaries. Built separately from the host daemon because
+# they pull in controller-runtime (much heavier than the daemon itself).
+build-k8s:
+	GOARCH=$(GOARCH) go build -o $(BINARY_CONTROLLER) ./cmd/tunneld-controller
+	GOARCH=$(GOARCH) go build -o $(BINARY_AGENT) ./cmd/tunneld-agent
+
+# Regenerate CRD manifests, RBAC, and deepcopy methods from kubebuilder markers.
+# Requires controller-gen on $PATH (go install sigs.k8s.io/controller-tools/cmd/controller-gen@latest).
+generate-k8s:
+	controller-gen object:headerFile=/dev/null paths=./k8s/api/v1alpha1/...
+	controller-gen rbac:roleName=tunneld-controller crd paths=./k8s/... \
+		output:crd:artifacts:config=k8s/config/crd \
+		output:rbac:artifacts:config=k8s/config/rbac
+
+image-controller:
+	docker build -f k8s/Dockerfile.controller -t $(IMAGE_REGISTRY)/$(BINARY_CONTROLLER):$(IMAGE_TAG) .
+
+image-agent:
+	docker build -f k8s/Dockerfile.agent -t $(IMAGE_REGISTRY)/$(BINARY_AGENT):$(IMAGE_TAG) .
+
 test:
-	go test ./...
+	go test -coverprofile=coverage.out -covermode=atomic ./...
+
+coverage: test
+	go tool cover -html=coverage.out
 
 clean:
-	rm -f $(BINARY_TUNNELD) $(BINARY_TUNNELCTL)
+	rm -f $(BINARY_TUNNELD) $(BINARY_TUNNELCTL) $(BINARY_CONTROLLER) $(BINARY_AGENT)
 	rm -rf pkg-build
-	rm -f *.deb *.zip
+	rm -f *.deb *.zip coverage.out
 
 proto:
 	PATH="$(PATH):$(shell go env GOPATH)/bin" protoc --proto_path=api/v1 --go_out=pkg/api/v1 --go_opt=paths=source_relative --go-grpc_out=pkg/api/v1 --go-grpc_opt=paths=source_relative api/v1/tunnel.proto api/v1/spec.proto
@@ -60,6 +87,8 @@ package-deb: build
 	@echo "[Service]" >> pkg-build/lib/systemd/system/tunneld.service
 	@echo "User=tunneld" >> pkg-build/lib/systemd/system/tunneld.service
 	@echo "Group=tunneld" >> pkg-build/lib/systemd/system/tunneld.service
+	@echo "RuntimeDirectory=tunneld" >> pkg-build/lib/systemd/system/tunneld.service
+	@echo "RuntimeDirectoryMode=0750" >> pkg-build/lib/systemd/system/tunneld.service
 	@echo "ExecStart=/usr/local/bin/tunneld --config /etc/tunneld/tunnels.yaml run" >> pkg-build/lib/systemd/system/tunneld.service
 	@echo "Restart=always" >> pkg-build/lib/systemd/system/tunneld.service
 	@echo "RestartSec=3" >> pkg-build/lib/systemd/system/tunneld.service

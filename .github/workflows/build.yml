@@ -2,9 +2,9 @@ name: Build and Package
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master, 'feature/*' ]
   pull_request:
-    branches: [ main ]
+    branches: [ master, 'feature/*' ]
 
 jobs:
   build:
@@ -29,6 +29,19 @@ jobs:
         run: make test
         env:
           GONOSUMDB: github.com/BrunoSilvaFreire
+
+      - name: Coverage Summary
+        run: |
+          echo "## Code Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          go tool cover -func=coverage.out >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Coverage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
 
       - name: Build packages
         run: |

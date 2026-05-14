@@ -13,9 +13,11 @@ var waitTimeout int
 
 var waitCmd = &cobra.Command{
 	Use:   "wait <name>",
-	Short: "Wait for a tunnel to be healthy",
+	Short: "Wait for a tunnel to be ready",
 	Args:  cobra.ExactArgs(1),
+	ValidArgsFunction: tunnelNameCompletion,
 	Run: func(cmd *cobra.Command, args []string) {
+
 		client, conn := getClient()
 		defer conn.Close()
 

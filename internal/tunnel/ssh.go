@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"time"
+
+	"github.com/BrunoSilvaFreire/tunneld/internal/constants"
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
 
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -23,7 +25,7 @@ type SSHForward struct {
 	TargetPort    int
 }
 
-func NewSSHSpec(name string, dependsOn []string, user, host string, port int, identityKey string, forwards []SSHForward, options map[string]string, health *pb.HealthCheckSpec, restart *pb.RestartPolicySpec, startup, shutdown time.Duration) *SSHSpec {
+func NewSSHSpec(name string, dependsOn []string, user, host string, port int, identityKeyFile, identityKeyRef string, forwards []SSHForward, options map[string]string, health *pb.HealthCheckSpec, restart *pb.RestartPolicySpec, startup, shutdown time.Duration) *SSHSpec {
 	pbForwards := make([]*pb.SSHForward, len(forwards))
 	for i, f := range forwards {
 		pbForwards[i] = &pb.SSHForward{
@@ -44,12 +46,13 @@ func NewSSHSpec(name string, dependsOn []string, user, host string, port int, id
 			ShutdownTimeout: durationpb.New(shutdown),
 			Type: &pb.TunnelSpec_Ssh{
 				Ssh: &pb.SSHSpec{
-					User:          user,
-					Host:          host,
-					Port:          int32(port),
-					IdentityKey:   identityKey,
-					LocalForwards: pbForwards,
-					Options:       options,
+					User:            user,
+					Host:            host,
+					Port:            int32(port),
+					IdentityKeyFile: identityKeyFile,
+					IdentityKeyRef:  identityKeyRef,
+					LocalForwards:   pbForwards,
+					Options:         options,
 				},
 			},
 		},
@@ -80,15 +83,20 @@ func (s *SSHSpec) BuildCommand(ctx context.Context, keyDir string) (*exec.Cmd, e
 	ssh := s.pbSpec.GetSsh()
 	var identityPath string
 
-	if ssh.IdentityKey != "" {
-		identityPath = filepath.Join(keyDir, ssh.IdentityKey)
+	if ssh.IdentityKeyFile != "" {
+		identityPath = ssh.IdentityKeyFile
+	} else if ssh.IdentityKeyRef != "" {
+		identityPath = filepath.Join(keyDir, ssh.IdentityKeyRef)
+	}
+
+	if identityPath != "" {
 		if _, err := os.Stat(identityPath); err != nil {
-			return nil, fmt.Errorf("identity key %q not found in %s: %v", ssh.IdentityKey, keyDir, err)
+			return nil, fmt.Errorf("identity key %q not found: %v", identityPath, err)
 		}
 		// Try to open it for reading to ensure permissions are correct for the current user
 		f, err := os.Open(identityPath)
 		if err != nil {
-			return nil, fmt.Errorf("identity key %q is not readable: %v", ssh.IdentityKey, err)
+			return nil, fmt.Errorf("identity key %q is not readable: %v", identityPath, err)
 		}
 		f.Close()
 	}
@@ -122,7 +130,7 @@ func (s *SSHSpec) BuildCommand(ctx context.Context, keyDir string) (*exec.Cmd, e
 	for _, f := range ssh.LocalForwards {
 		listen := f.ListenAddress
 		if listen == "" {
-			listen = "127.0.0.1"
+			listen = constants.DefaultListenAddress
 		}
 		args = append(args, "-L", fmt.Sprintf("%s:%d:%s:%d", listen, f.ListenPort, f.TargetHost, f.TargetPort))
 	}

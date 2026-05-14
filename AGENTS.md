@@ -20,7 +20,7 @@ This document provides a technical overview and architectural insights for agent
 
 ### Communication Layer (`internal/api`)
 - **gRPC:** The primary control mechanism. Defined in `api/v1/tunnel.proto` and `api/v1/spec.proto`.
-- **Socket:** Listens on a Unix Domain Socket (default: `/tmp/tunneld.sock`).
+- **Socket:** Listens on a Unix Domain Socket (default: `/run/tunneld/tunneld.sock`).
 - **Dynamic Control:** Supports runtime creation and deletion of tunnels without restarting the daemon.
 
 ## 3. Protocol & Data Structures

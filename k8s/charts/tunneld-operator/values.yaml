@@ -1,0 +1,61 @@
+# Default values for tunneld-operator.
+
+# Deployment mode for the per-node agent.
+#   host-installed: tunneld runs on the host (e.g. installed from the .deb).
+#                   Agent pod hostPath-mounts the daemon's socket and key dir.
+#                   Pods opt in via the tunneld.io/installed=true node label.
+#   daemonset:      tunneld runs as a sidecar in the agent pod with
+#                   hostNetwork: true so tunnel ports bind on the node IP.
+mode: host-installed
+
+# CRDs ship in the chart's crds/ directory. Helm installs them on first install
+# only — for upgrades, re-apply them with `kubectl apply -f` against the chart's
+# crds/ directory, or replace the chart's crds/ with --skip-crds and manage
+# them separately.
+
+namespace:
+  # Create the tunneld-system namespace. Set to false if you manage it elsewhere.
+  create: true
+  name: tunneld-system
+
+controller:
+  replicas: 1
+  image:
+    repository: ghcr.io/brunosilvafreire/tunneld-controller
+    tag: latest
+    pullPolicy: IfNotPresent
+  leaderElect: true
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits:   { cpu: 500m, memory: 256Mi }
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+agent:
+  image:
+    repository: ghcr.io/brunosilvafreire/tunneld-agent
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits:   { cpu: 200m, memory: 128Mi }
+  # Mode A only: restrict the DaemonSet to nodes labeled
+  # `tunneld.io/installed=true`. Set extraNodeSelector to add labels.
+  extraNodeSelector: {}
+  tolerations:
+    - operator: Exists
+  hostSocketPath: /run/tunneld     # mode A only
+  hostKeyDir: /var/lib/tunneld/keys # mode A only
+
+# Mode B only: the bundled tunneld sidecar.
+tunneld:
+  image:
+    repository: ghcr.io/brunosilvafreire/tunneld
+    tag: latest
+    pullPolicy: IfNotPresent
+
+rbac:
+  # When false the chart will not create the ClusterRole / ClusterRoleBinding;
+  # use this if your cluster operators manage RBAC out-of-band.
+  create: true

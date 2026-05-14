@@ -67,6 +67,7 @@ var keyDeleteCmd = &cobra.Command{
 	Use:   "delete <name>",
 	Short: "Delete a key from tunneld",
 	Args:  cobra.ExactArgs(1),
+	ValidArgsFunction: keyNameCompletion,
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
 

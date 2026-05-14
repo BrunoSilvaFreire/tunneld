@@ -1,0 +1,57 @@
+# Mode A: tunneld is pre-installed on every node (systemd unit from the .deb).
+# The agent pod talks to the host daemon via its Unix socket on hostPath.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: tunneld-agent
+  namespace: tunneld-system
+  labels:
+    app.kubernetes.io/name: tunneld-agent
+    tunneld.io/mode: host-installed
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tunneld-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tunneld-agent
+    spec:
+      serviceAccountName: tunneld-agent
+      # Restrict to nodes opted in via a label so we don't try to schedule on
+      # control-plane nodes that don't have tunneld installed.
+      nodeSelector:
+        tunneld.io/installed: "true"
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: agent
+          image: ghcr.io/brunosilvafreire/tunneld-agent:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - --socket=/run/tunneld/tunneld.sock
+          env:
+            - name: NODE_NAME
+              valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+          volumeMounts:
+            - name: tunneld-socket
+              mountPath: /run/tunneld
+            - name: tunneld-keys
+              mountPath: /var/lib/tunneld/keys
+          ports:
+            - { name: metrics, containerPort: 8080 }
+            - { name: probes,  containerPort: 8081 }
+          livenessProbe:  { httpGet: { path: /healthz, port: probes }, initialDelaySeconds: 15, periodSeconds: 20 }
+          readinessProbe: { httpGet: { path: /readyz,  port: probes }, initialDelaySeconds: 5,  periodSeconds: 10 }
+          resources:
+            requests: { cpu: 25m, memory: 32Mi }
+            limits:   { cpu: 200m, memory: 128Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+      volumes:
+        - name: tunneld-socket
+          hostPath: { path: /run/tunneld, type: Directory }
+        - name: tunneld-keys
+          hostPath: { path: /var/lib/tunneld/keys, type: DirectoryOrCreate }

@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: bastion-ssh-secret
+  namespace: data
+type: Opaque
+stringData:
+  id_rsa: |
+    -----BEGIN OPENSSH PRIVATE KEY-----
+    REPLACE_ME
+    -----END OPENSSH PRIVATE KEY-----
+---
+apiVersion: tunneld.io/v1alpha1
+kind: TunnelKey
+metadata:
+  name: bastion-ssh
+  namespace: data
+spec:
+  type: ssh-private-key
+  source:
+    secretRef:
+      name: bastion-ssh-secret
+      key: id_rsa

@@ -28,6 +28,7 @@ func TestSSHBuildCommand(t *testing.T) {
 		"user",
 		"host.com",
 		2222,
+		"",
 		keyName,
 		[]SSHForward{
 			{ListenAddress: "127.0.0.1", ListenPort: 8080, TargetHost: "remote", TargetPort: 80},
@@ -73,6 +74,7 @@ func TestKubectlBuildCommand(t *testing.T) {
 	spec := NewKubectlSpec(
 		"test-kube",
 		[]string{"test-ssh"},
+		"",
 		"kubeconfig",
 		"prod",
 		"myns",

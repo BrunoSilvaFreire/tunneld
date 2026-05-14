@@ -8,10 +8,12 @@ option go_package = "tunneld/pkg/api/v1;tunnelv1";
 
 service TunnelService {
   rpc Status(StatusRequest) returns (StatusResponse);
+  rpc WatchStatus(WatchStatusRequest) returns (stream StatusResponse);
   rpc Start(StartRequest) returns (StartResponse);
   rpc Stop(StopRequest) returns (StopResponse);
   rpc Wait(WaitRequest) returns (WaitResponse);
   rpc Create(CreateRequest) returns (CreateResponse);
+  rpc Update(UpdateRequest) returns (UpdateResponse);
   rpc Delete(DeleteRequest) returns (DeleteResponse);
   rpc Logs(LogsRequest) returns (stream LogsResponse);
   rpc Enable(EnableRequest) returns (EnableResponse);
@@ -43,6 +45,14 @@ message StatusResponse {
   repeated TunnelStatus tunnels = 1;
 }
 
+message WatchStatusRequest {
+  // Optional: stream only this tunnel. Empty means all tunnels.
+  string name = 1;
+  // Optional: server-side poll interval in milliseconds. 0 = server default (2000).
+  // Bounded to [200, 60000] by the server.
+  int32 interval_ms = 2;
+}
+
 message StartRequest {
   string name = 1;
 }
@@ -68,9 +78,18 @@ message WaitResponse {
 message CreateRequest {
   TunnelSpec spec = 1;
   map<string, bytes> inline_keys = 2;
+  bool persistent = 3;
 }
 
 message CreateResponse {}
+
+message UpdateRequest {
+  TunnelSpec spec = 1;
+  map<string, bytes> inline_keys = 2;
+  bool persistent = 3;
+}
+
+message UpdateResponse {}
 
 message DeleteRequest {
   string name = 1;

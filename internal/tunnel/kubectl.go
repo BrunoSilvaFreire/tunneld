@@ -21,7 +21,7 @@ type KubectlForward struct {
 	RemotePort   int
 }
 
-func NewKubectlSpec(name string, dependsOn []string, kubeconfigKey, context, namespace, resource string, forwards []KubectlForward, apiServer string, skipTLS bool, health *pb.HealthCheckSpec, restart *pb.RestartPolicySpec, startup, shutdown time.Duration) *KubectlSpec {
+func NewKubectlSpec(name string, dependsOn []string, kubeconfigFile, kubeconfigRef, context, namespace, resource string, forwards []KubectlForward, apiServer string, skipTLS bool, health *pb.HealthCheckSpec, restart *pb.RestartPolicySpec, startup, shutdown time.Duration) *KubectlSpec {
 	pbForwards := make([]*pb.KubectlForward, len(forwards))
 	for i, f := range forwards {
 		pbForwards[i] = &pb.KubectlForward{
@@ -41,7 +41,8 @@ func NewKubectlSpec(name string, dependsOn []string, kubeconfigKey, context, nam
 			ShutdownTimeout: durationpb.New(shutdown),
 			Type: &pb.TunnelSpec_Kubectl{
 				Kubectl: &pb.KubectlSpec{
-					KubeconfigKey:         kubeconfigKey,
+					KubeconfigFile:        kubeconfigFile,
+					KubeconfigRef:         kubeconfigRef,
 					Context:               context,
 					Namespace:             namespace,
 					Resource:              resource,
@@ -67,8 +68,14 @@ func (s *KubectlSpec) BuildCommand(ctx context.Context, keyDir string) (*exec.Cm
 	k := s.pbSpec.GetKubectl()
 	args := []string{}
 
-	if k.KubeconfigKey != "" {
-		kubeconfigPath := filepath.Join(keyDir, k.KubeconfigKey)
+	var kubeconfigPath string
+	if k.KubeconfigFile != "" {
+		kubeconfigPath = k.KubeconfigFile
+	} else if k.KubeconfigRef != "" {
+		kubeconfigPath = filepath.Join(keyDir, k.KubeconfigRef)
+	}
+
+	if kubeconfigPath != "" {
 		args = append(args, "--kubeconfig", kubeconfigPath)
 	}
 	if k.Context != "" {

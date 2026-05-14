@@ -12,7 +12,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var createConfigPath string
+var (
+	createConfigPath string
+	createPersistent bool
+)
 
 var createCmd = &cobra.Command{
 	Use:   "create <name>",
@@ -50,16 +53,18 @@ var createCmd = &cobra.Command{
 		_, err = client.Create(context.Background(), &pb.CreateRequest{
 			Spec:       protoSpec,
 			InlineKeys: inlineKeys,
+			Persistent: createPersistent,
 		})
 		if err != nil {
 			log.Fatalf("could not create: %v", err)
 		}
-		fmt.Printf("Tunnel %q created\n", name)
+		fmt.Printf("Tunnel %q created (persistent: %v)\n", name, createPersistent)
 	},
 }
 
 func init() {
 	createCmd.Flags().StringVar(&createConfigPath, "config", "", "Path to tunnel YAML config")
+	createCmd.Flags().BoolVar(&createPersistent, "persistent", false, "Whether the tunnel should be persisted to disk")
 	createCmd.MarkFlagRequired("config")
 	rootCmd.AddCommand(createCmd)
 }

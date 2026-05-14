@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/BrunoSilvaFreire/tunneld/internal/constants"
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
 	"google.golang.org/protobuf/proto"
 )
@@ -29,7 +30,7 @@ func ResolvePortsInProto(spec *pb.TunnelSpec) (*pb.TunnelSpec, []PortMapping, er
 		for _, f := range ssh.LocalForwards {
 			addr := f.ListenAddress
 			if addr == "" {
-				addr = "127.0.0.1"
+				addr = constants.DefaultListenAddress
 			}
 			configured := f.ListenPort
 			actual := configured
@@ -54,7 +55,7 @@ func ResolvePortsInProto(spec *pb.TunnelSpec) (*pb.TunnelSpec, []PortMapping, er
 		for _, f := range kc.Forwards {
 			addr := f.LocalAddress
 			if addr == "" {
-				addr = "127.0.0.1"
+				addr = constants.DefaultListenAddress
 			}
 			configured := f.LocalPort
 			actual := configured
@@ -90,7 +91,7 @@ func LocalPortKeys(spec *pb.TunnelSpec) []string {
 			}
 			addr := f.ListenAddress
 			if addr == "" {
-				addr = "127.0.0.1"
+				addr = constants.DefaultListenAddress
 			}
 			keys = append(keys, net.JoinHostPort(addr, fmt.Sprintf("%d", f.ListenPort)))
 		}
@@ -102,7 +103,7 @@ func LocalPortKeys(spec *pb.TunnelSpec) []string {
 			}
 			addr := f.LocalAddress
 			if addr == "" {
-				addr = "127.0.0.1"
+				addr = constants.DefaultListenAddress
 			}
 			keys = append(keys, net.JoinHostPort(addr, fmt.Sprintf("%d", f.LocalPort)))
 		}

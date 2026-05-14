@@ -1,0 +1,37 @@
+apiVersion: tunneld.io/v1alpha1
+kind: TunnelGroup
+metadata:
+  name: prod-data
+  namespace: data
+spec:
+  nodeSelector:
+    role: tunnels
+  tunnels:
+    - name: bastion
+      ssh:
+        user: ec2-user
+        host: bastion.example.com
+        port: 22
+        identityKeyRef: { name: bastion-ssh }
+        localForwards:
+          - listenAddress: 127.0.0.1
+            listenPort: 0
+            targetHost: kube-api.internal
+            targetPort: 6443
+    - name: pg
+      dependsOn: [bastion]
+      kubectl:
+        kubeconfigRef: { name: prod-kubeconfig }
+        context: prod
+        namespace: data
+        resource: svc/postgres
+        forwards:
+          - localAddress: 0.0.0.0
+            localPort: 0
+            remotePort: 5432
+        # apiServer points at the bastion's local forward (bound on 127.0.0.1)
+        apiServer: https://127.0.0.1:6443
+        insecureSkipTLSVerify: true
+  expose:
+    - tunnel: pg
+      serviceName: pg

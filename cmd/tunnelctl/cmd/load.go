@@ -12,6 +12,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var loadPersistent bool
+
 var loadCmd = &cobra.Command{
 	Use:   "load <path>",
 	Short: "Load all tunnels from a YAML config file",
@@ -50,6 +52,7 @@ var loadCmd = &cobra.Command{
 			_, err = client.Create(context.Background(), &pb.CreateRequest{
 				Spec:       protoSpec,
 				InlineKeys: inlineKeys,
+				Persistent: loadPersistent,
 			})
 			if err != nil {
 				log.Printf("Failed to create tunnel %q: %v", name, err)
@@ -63,7 +66,7 @@ var loadCmd = &cobra.Command{
 				hasError = true
 				continue
 			}
-			fmt.Printf("Tunnel %q loaded and started\n", name)
+			fmt.Printf("Tunnel %q loaded and started (persistent: %v)\n", name, loadPersistent)
 		}
 
 		if hasError {
@@ -73,5 +76,6 @@ var loadCmd = &cobra.Command{
 }
 
 func init() {
+	loadCmd.Flags().BoolVar(&loadPersistent, "persistent", false, "Whether the tunnels should be persisted to disk")
 	rootCmd.AddCommand(loadCmd)
 }

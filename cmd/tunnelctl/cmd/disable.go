@@ -10,10 +10,12 @@ import (
 )
 
 var disableCmd = &cobra.Command{
-	Use:   "disable [name]",
-	Short: "Disable a tunnel and stop it",
+	Use:   "disable <name>",
+	Short: "Disable a tunnel (no autostart)",
 	Args:  cobra.ExactArgs(1),
+	ValidArgsFunction: tunnelNameCompletion,
 	Run: func(cmd *cobra.Command, args []string) {
+
 		client, conn := getClient()
 		defer conn.Close()
 

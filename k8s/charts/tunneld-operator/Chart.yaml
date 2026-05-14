@@ -1,0 +1,16 @@
+apiVersion: v2
+name: tunneld-operator
+description: Kubernetes operator and per-node agent for tunneld.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - tunnel
+  - ssh
+  - port-forward
+  - operator
+maintainers:
+  - name: tunneld team
+home: https://github.com/BrunoSilvaFreire/tunneld
+sources:
+  - https://github.com/BrunoSilvaFreire/tunneld

@@ -14,30 +14,28 @@ func slurpKeys(spec *pb.TunnelSpec) (map[string][]byte, error) {
 
 	switch s := spec.Type.(type) {
 	case *pb.TunnelSpec_Ssh:
-		if s.Ssh.IdentityKey != "" && isPath(s.Ssh.IdentityKey) {
-			content, name, err := readLocalKey(s.Ssh.IdentityKey)
+		if s.Ssh.IdentityKeyFile != "" {
+			content, name, err := readLocalKey(s.Ssh.IdentityKeyFile)
 			if err != nil {
 				return nil, err
 			}
 			inlineKeys[name] = content
-			s.Ssh.IdentityKey = name
+			s.Ssh.IdentityKeyFile = ""
+			s.Ssh.IdentityKeyRef = name
 		}
 	case *pb.TunnelSpec_Kubectl:
-		if s.Kubectl.KubeconfigKey != "" && isPath(s.Kubectl.KubeconfigKey) {
-			content, name, err := readLocalKey(s.Kubectl.KubeconfigKey)
+		if s.Kubectl.KubeconfigFile != "" {
+			content, name, err := readLocalKey(s.Kubectl.KubeconfigFile)
 			if err != nil {
 				return nil, err
 			}
 			inlineKeys[name] = content
-			s.Kubectl.KubeconfigKey = name
+			s.Kubectl.KubeconfigFile = ""
+			s.Kubectl.KubeconfigRef = name
 		}
 	}
 
 	return inlineKeys, nil
-}
-
-func isPath(s string) bool {
-	return strings.Contains(s, string(filepath.Separator)) || strings.HasPrefix(s, ".") || strings.HasPrefix(s, "~")
 }
 
 func readLocalKey(path string) ([]byte, string, error) {

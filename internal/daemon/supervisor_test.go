@@ -35,14 +35,14 @@ func (m testSpec) ToProto() *pb.TunnelSpec {
 
 func newTestSupervisor(t *testing.T) *Supervisor {
 	t.Helper()
-	return NewSupervisor(dependency.NewPlanner(nil), &config.Config{}, t.TempDir())
+	return NewSupervisor(dependency.NewPlanner(nil), &config.Config{}, t.TempDir(), t.TempDir())
 }
 
 func TestAddTunnel_RegistersProcess(t *testing.T) {
 	s := newTestSupervisor(t)
 	spec := testSpec{name: "my-tunnel", restart: &pb.RestartPolicySpec{Policy: "never"}}
 
-	if err := s.AddTunnel(context.Background(), spec); err != nil {
+	if err := s.AddTunnel(context.Background(), spec, false); err != nil {
 		t.Fatalf("AddTunnel: %v", err)
 	}
 	if _, err := s.GetProcess("my-tunnel"); err != nil {
@@ -57,10 +57,10 @@ func TestAddTunnel_Duplicate(t *testing.T) {
 	s := newTestSupervisor(t)
 	spec := testSpec{name: "my-tunnel", restart: &pb.RestartPolicySpec{Policy: "never"}}
 
-	if err := s.AddTunnel(context.Background(), spec); err != nil {
+	if err := s.AddTunnel(context.Background(), spec, false); err != nil {
 		t.Fatalf("first AddTunnel: %v", err)
 	}
-	err := s.AddTunnel(context.Background(), spec)
+	err := s.AddTunnel(context.Background(), spec, false)
 	if err == nil {
 		t.Fatal("expected error on duplicate AddTunnel, got nil")
 	}
@@ -73,7 +73,7 @@ func TestWaitHealthy_AlreadyRunning(t *testing.T) {
 	s := newTestSupervisor(t)
 	spec := testSpec{name: "my-tunnel", restart: &pb.RestartPolicySpec{Policy: "never"}}
 
-	if err := s.AddTunnel(context.Background(), spec); err != nil {
+	if err := s.AddTunnel(context.Background(), spec, false); err != nil {
 		t.Fatalf("AddTunnel: %v", err)
 	}
 	p, _ := s.GetProcess("my-tunnel")
@@ -98,7 +98,7 @@ func TestWaitHealthy_TransientFailed_AlwaysPolicy(t *testing.T) {
 		restart: &pb.RestartPolicySpec{Policy: "always"},
 	}
 
-	if err := s.AddTunnel(context.Background(), spec); err != nil {
+	if err := s.AddTunnel(context.Background(), spec, false); err != nil {
 		t.Fatalf("AddTunnel: %v", err)
 	}
 	p, _ := s.GetProcess("my-tunnel")
@@ -126,7 +126,7 @@ func TestWaitHealthy_Failed_NeverPolicy(t *testing.T) {
 		restart: &pb.RestartPolicySpec{Policy: "never"},
 	}
 
-	if err := s.AddTunnel(context.Background(), spec); err != nil {
+	if err := s.AddTunnel(context.Background(), spec, false); err != nil {
 		t.Fatalf("AddTunnel: %v", err)
 	}
 	p, _ := s.GetProcess("my-tunnel")
@@ -142,7 +142,7 @@ func TestWaitHealthy_Timeout(t *testing.T) {
 	s := newTestSupervisor(t)
 	spec := testSpec{name: "my-tunnel", restart: &pb.RestartPolicySpec{Policy: "always"}}
 
-	if err := s.AddTunnel(context.Background(), spec); err != nil {
+	if err := s.AddTunnel(context.Background(), spec, false); err != nil {
 		t.Fatalf("AddTunnel: %v", err)
 	}
 	// Status remains StatusStopped — will never become Running on its own.

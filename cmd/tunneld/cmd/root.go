@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/BrunoSilvaFreire/tunneld/internal/constants"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -12,6 +13,7 @@ var (
 	cfgFile    string
 	socketPath string
 	keyDir     string
+	tunnelsDir string
 )
 
 var rootCmd = &cobra.Command{
@@ -30,13 +32,15 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "tunnels.yaml", "Path to config file")
-	rootCmd.PersistentFlags().StringVar(&socketPath, "socket", "/tmp/tunneld.sock", "Path to gRPC unix socket")
-	rootCmd.PersistentFlags().StringVar(&keyDir, "key-dir", "/var/lib/tunneld/keys", "Directory to store managed keys")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", constants.DefaultConfigFile, "Path to config file")
+	rootCmd.PersistentFlags().StringVar(&socketPath, "socket", constants.DefaultSocketPath, "Path to gRPC unix socket")
+	rootCmd.PersistentFlags().StringVar(&keyDir, "key-dir", constants.DefaultKeyDir, "Directory to store managed keys")
+	rootCmd.PersistentFlags().StringVar(&tunnelsDir, "tunnels-dir", constants.DefaultTunnelsDir, "Directory to store persistent tunnel configurations")
 
 	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
 	viper.BindPFlag("socket", rootCmd.PersistentFlags().Lookup("socket"))
 	viper.BindPFlag("key-dir", rootCmd.PersistentFlags().Lookup("key-dir"))
+	viper.BindPFlag("tunnels-dir", rootCmd.PersistentFlags().Lookup("tunnels-dir"))
 }
 
 func initConfig() {

@@ -1,0 +1,33 @@
+apiVersion: tunneld.io/v1alpha1
+kind: Tunnel
+metadata:
+  name: pg-via-bastion
+  namespace: data
+spec:
+  ssh:
+    user: ec2-user
+    host: bastion.example.com
+    port: 22
+    identityKeyRef:
+      name: bastion-ssh
+    localForwards:
+      - listenAddress: 0.0.0.0
+        listenPort: 0          # dynamic; actualPort surfaces in status
+        targetHost: pg.internal
+        targetPort: 5432
+    options:
+      ServerAliveInterval: "30"
+      StrictHostKeyChecking: "no"
+  health:
+    type: tcp
+    interval: 10s
+    startupTimeout: 30s
+  restart:
+    policy: on-failure
+    delay: 2s
+    backoff:
+      multiplierMilli: 2000
+      maxDelay: 60s
+  expose:
+    service: true
+    serviceName: pg

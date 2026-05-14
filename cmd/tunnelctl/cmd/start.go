@@ -13,6 +13,7 @@ var startCmd = &cobra.Command{
 	Use:   "start <name>",
 	Short: "Start a tunnel",
 	Args:  cobra.ExactArgs(1),
+	ValidArgsFunction: tunnelNameCompletion,
 	Run: func(cmd *cobra.Command, args []string) {
 		client, conn := getClient()
 		defer conn.Close()

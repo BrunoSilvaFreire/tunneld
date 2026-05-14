@@ -35,8 +35,8 @@ options:
   bin_path:
     description: Explicit path to the C(tunnelctl) binary.
     type: str
-  server_address:
-    description: The gRPC address of the tunneld server.
+  socket_path:
+    description: Path to the tunneld Unix socket.
     type: str
   wait:
     description: Whether to wait for the tunnel to become healthy before returning.
@@ -62,7 +62,7 @@ EXAMPLES = r'''
         user: bruno
         host: remote.example.com
         port: 22
-        identity_key: ~/.ssh/id_rsa
+        identity_key_ref: ssh-identity-key
         local_forwards:
           - listen_port: 8080
             target_host: localhost
@@ -90,14 +90,13 @@ from ansible.module_utils.basic import AnsibleModule
 
 class TunneldManager(object):
     def __init__(self, module):
-        self.module = module
         self.bin_path = module.params.get('bin_path') or module.get_bin_path('tunnelctl', required=True)
-        self.server_address = module.params.get('server_address')
+        self.socket_path = module.params.get('socket_path')
 
     def _run_command_raw(self, args):
         cmd = [self.bin_path]
-        if self.server_address:
-            cmd.extend(['--server', self.server_address])
+        if self.socket_path:
+            cmd.extend(['--socket', self.socket_path])
         cmd.extend(args)
         return self.module.run_command(cmd)
 
@@ -171,7 +170,7 @@ def main():
             state=dict(type='str', default='started', choices=['present', 'absent', 'started', 'stopped']),
             definition=dict(type='dict'),
             bin_path=dict(type='str'),
-            server_address=dict(type='str'),
+            socket_path=dict(type='str'),
             wait=dict(type='bool', default=True),
             wait_timeout=dict(type='int', default=30),
         ),

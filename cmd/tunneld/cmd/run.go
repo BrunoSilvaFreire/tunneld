@@ -10,6 +10,7 @@ import (
 
 	"github.com/BrunoSilvaFreire/tunneld/internal/api"
 	"github.com/BrunoSilvaFreire/tunneld/internal/config"
+	"github.com/BrunoSilvaFreire/tunneld/internal/constants"
 	"github.com/BrunoSilvaFreire/tunneld/internal/daemon"
 	"github.com/BrunoSilvaFreire/tunneld/internal/dependency"
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
@@ -22,22 +23,37 @@ var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run the tunneld supervisor daemon",
 	Run: func(cmd *cobra.Command, args []string) {
-		run(viper.GetString("config"), viper.GetString("socket"), viper.GetString("key-dir"))
+		run(
+			viper.GetString("config"),
+			viper.GetString("socket"),
+			viper.GetString("key-dir"),
+			viper.GetString("tunnels-dir"),
+			viper.GetBool("no-config"),
+		)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(runCmd)
+	runCmd.Flags().Bool("no-config", false, "Ignore the YAML config file; tunnels come from runtime API only")
+	_ = viper.BindPFlag("no-config", runCmd.Flags().Lookup("no-config"))
 }
 
-func run(path, socketPath, keyDirPath string) {
-	cfg, err := config.Load(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			log.Printf("Config file %s not found, starting with no tunnels", path)
-			cfg = &config.Config{Tunnels: make(map[string]config.TunnelConfig)}
-		} else {
-			log.Fatalf("Error loading config: %v", err)
+func run(path, socketPath, keyDirPath, tunnelsDirPath string, noConfig bool) {
+	var cfg *config.Config
+	if noConfig {
+		log.Printf("--no-config set: skipping config file load, starting with no tunnels")
+		cfg = &config.Config{Tunnels: make(map[string]config.TunnelConfig)}
+	} else {
+		var err error
+		cfg, err = config.Load(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				log.Printf("Config file %s not found, starting with no tunnels", path)
+				cfg = &config.Config{Tunnels: make(map[string]config.TunnelConfig)}
+			} else {
+				log.Fatalf("Error loading config: %v", err)
+			}
 		}
 	}
 
@@ -46,7 +62,7 @@ func run(path, socketPath, keyDirPath string) {
 	}
 	specs, _ := cfg.ToSpecs()
 	planner := dependency.NewPlanner(specs)
-	supervisor := daemon.NewSupervisor(planner, cfg, keyDirPath)
+	supervisor := daemon.NewSupervisor(planner, cfg, keyDirPath, tunnelsDirPath)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -58,7 +74,7 @@ func run(path, socketPath, keyDirPath string) {
 	if err != nil {
 		log.Fatalf("Failed to listen on %s: %v", socketPath, err)
 	}
-	if err := os.Chmod(socketPath, 0660); err != nil {
+	if err := os.Chmod(socketPath, constants.PermSocketPrivate); err != nil {
 		log.Printf("Warning: failed to set socket permissions: %v", err)
 	}
 	defer os.Remove(socketPath)

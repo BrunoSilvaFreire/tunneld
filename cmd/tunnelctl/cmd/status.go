@@ -8,11 +8,13 @@ import (
 
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
 	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 var statusCmd = &cobra.Command{
 	Use:   "status [name]",
 	Short: "List all tunnels or status of one",
+	ValidArgsFunction: tunnelNameCompletion,
 	Run: func(cmd *cobra.Command, args []string) {
 		client, conn := getClient()
 		defer conn.Close()
@@ -25,6 +27,21 @@ var statusCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("could not get status: %v", err)
 		}
+
+		if name != "" && len(resp.Tunnels) == 1 {
+			t := resp.Tunnels[0]
+			fmt.Printf("Tunnel: %s\n", t.Name)
+			fmt.Printf("Status: %s\n", t.Status)
+			if t.Error != "" {
+				fmt.Printf("Error:  %s\n", t.Error)
+			}
+			fmt.Println("Spec:")
+			m := protojson.MarshalOptions{Multiline: true, Indent: "  "}
+			b, _ := m.Marshal(t.Spec)
+			fmt.Println(string(b))
+			return
+		}
+
 		fmt.Printf("%-20s %-10s %-10s %-25s %-20s %s\n", "NAME", "TYPE", "STATUS", "PORTS", "ERROR", "DEPENDENCIES")
 		for _, t := range resp.Tunnels {
 			typeStr := "unknown"

@@ -1,0 +1,13 @@
+version: '3'
+
+vars:
+  IMAGE: ghcr.io/brunosilvafreire/tunnelctl
+  TAG: latest
+  CONTAINERFILE: containers/Containerfile.tunnelctl
+
+tasks:
+  build:tunnelctl:
+    desc: Build tunnelctl image and load it into the k8s.io containerd namespace
+    cmds:
+      - sudo nerdctl build -t {{.IMAGE}}:{{.TAG}} -f {{.CONTAINERFILE}} .
+      - sudo nerdctl save {{.IMAGE}}:{{.TAG}} | sudo ctr --namespace k8s.io images import -

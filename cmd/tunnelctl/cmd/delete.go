@@ -13,6 +13,7 @@ var deleteCmd = &cobra.Command{
 	Use:   "delete <name>",
 	Short: "Delete a tunnel",
 	Args:  cobra.ExactArgs(1),
+	ValidArgsFunction: tunnelNameCompletion,
 	Run: func(cmd *cobra.Command, args []string) {
 		client, conn := getClient()
 		defer conn.Close()

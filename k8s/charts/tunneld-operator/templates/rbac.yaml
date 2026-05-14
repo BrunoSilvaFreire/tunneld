@@ -1,0 +1,58 @@
+{{- if .Values.rbac.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tunneld-controller
+  namespace: {{ include "tunneld.namespace" . }}
+  labels:
+    {{- include "tunneld.labels" . | nindent 4 }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tunneld-agent
+  namespace: {{ include "tunneld.namespace" . }}
+  labels:
+    {{- include "tunneld.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Name }}-tunneld-controller
+  labels:
+    {{- include "tunneld.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: [endpoints, services]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [""]
+    resources: [nodes, secrets]
+    verbs: [get, list, watch]
+  - apiGroups: [tunneld.io]
+    resources: [tunnelgroups, tunnelkeys, tunnels]
+    verbs: [create, delete, get, list, patch, update, watch]
+  - apiGroups: [tunneld.io]
+    resources: [tunnelgroups/status, tunnelkeys/status, tunnels/status]
+    verbs: [get, patch, update]
+  - apiGroups: [tunneld.io]
+    resources: [tunnels/finalizers]
+    verbs: [update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Name }}-tunneld-controller
+  labels:
+    {{- include "tunneld.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Name }}-tunneld-controller
+subjects:
+  - kind: ServiceAccount
+    name: tunneld-controller
+    namespace: {{ include "tunneld.namespace" . }}
+  - kind: ServiceAccount
+    name: tunneld-agent
+    namespace: {{ include "tunneld.namespace" . }}
+{{- end }}

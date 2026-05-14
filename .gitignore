@@ -2,6 +2,9 @@
 /tunneld
 /tunnelctl
 
+# Coverage
+coverage.out
+
 # Packages
 *.deb
 *.zip

@@ -19,15 +19,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	TunnelService_Status_FullMethodName  = "/tunnel.v1.TunnelService/Status"
-	TunnelService_Start_FullMethodName   = "/tunnel.v1.TunnelService/Start"
-	TunnelService_Stop_FullMethodName    = "/tunnel.v1.TunnelService/Stop"
-	TunnelService_Wait_FullMethodName    = "/tunnel.v1.TunnelService/Wait"
-	TunnelService_Create_FullMethodName  = "/tunnel.v1.TunnelService/Create"
-	TunnelService_Delete_FullMethodName  = "/tunnel.v1.TunnelService/Delete"
-	TunnelService_Logs_FullMethodName    = "/tunnel.v1.TunnelService/Logs"
-	TunnelService_Enable_FullMethodName  = "/tunnel.v1.TunnelService/Enable"
-	TunnelService_Disable_FullMethodName = "/tunnel.v1.TunnelService/Disable"
+	TunnelService_Status_FullMethodName      = "/tunnel.v1.TunnelService/Status"
+	TunnelService_WatchStatus_FullMethodName = "/tunnel.v1.TunnelService/WatchStatus"
+	TunnelService_Start_FullMethodName       = "/tunnel.v1.TunnelService/Start"
+	TunnelService_Stop_FullMethodName        = "/tunnel.v1.TunnelService/Stop"
+	TunnelService_Wait_FullMethodName        = "/tunnel.v1.TunnelService/Wait"
+	TunnelService_Create_FullMethodName      = "/tunnel.v1.TunnelService/Create"
+	TunnelService_Update_FullMethodName      = "/tunnel.v1.TunnelService/Update"
+	TunnelService_Delete_FullMethodName      = "/tunnel.v1.TunnelService/Delete"
+	TunnelService_Logs_FullMethodName        = "/tunnel.v1.TunnelService/Logs"
+	TunnelService_Enable_FullMethodName      = "/tunnel.v1.TunnelService/Enable"
+	TunnelService_Disable_FullMethodName     = "/tunnel.v1.TunnelService/Disable"
 )
 
 // TunnelServiceClient is the client API for TunnelService service.
@@ -35,10 +37,12 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TunnelServiceClient interface {
 	Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error)
+	WatchStatus(ctx context.Context, in *WatchStatusRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StatusResponse], error)
 	Start(ctx context.Context, in *StartRequest, opts ...grpc.CallOption) (*StartResponse, error)
 	Stop(ctx context.Context, in *StopRequest, opts ...grpc.CallOption) (*StopResponse, error)
 	Wait(ctx context.Context, in *WaitRequest, opts ...grpc.CallOption) (*WaitResponse, error)
 	Create(ctx context.Context, in *CreateRequest, opts ...grpc.CallOption) (*CreateResponse, error)
+	Update(ctx context.Context, in *UpdateRequest, opts ...grpc.CallOption) (*UpdateResponse, error)
 	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
 	Logs(ctx context.Context, in *LogsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[LogsResponse], error)
 	Enable(ctx context.Context, in *EnableRequest, opts ...grpc.CallOption) (*EnableResponse, error)
@@ -62,6 +66,25 @@ func (c *tunnelServiceClient) Status(ctx context.Context, in *StatusRequest, opt
 	}
 	return out, nil
 }
+
+func (c *tunnelServiceClient) WatchStatus(ctx context.Context, in *WatchStatusRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StatusResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &TunnelService_ServiceDesc.Streams[0], TunnelService_WatchStatus_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[WatchStatusRequest, StatusResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type TunnelService_WatchStatusClient = grpc.ServerStreamingClient[StatusResponse]
 
 func (c *tunnelServiceClient) Start(ctx context.Context, in *StartRequest, opts ...grpc.CallOption) (*StartResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -103,6 +126,16 @@ func (c *tunnelServiceClient) Create(ctx context.Context, in *CreateRequest, opt
 	return out, nil
 }
 
+func (c *tunnelServiceClient) Update(ctx context.Context, in *UpdateRequest, opts ...grpc.CallOption) (*UpdateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateResponse)
+	err := c.cc.Invoke(ctx, TunnelService_Update_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *tunnelServiceClient) Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeleteResponse)
@@ -115,7 +148,7 @@ func (c *tunnelServiceClient) Delete(ctx context.Context, in *DeleteRequest, opt
 
 func (c *tunnelServiceClient) Logs(ctx context.Context, in *LogsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[LogsResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &TunnelService_ServiceDesc.Streams[0], TunnelService_Logs_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &TunnelService_ServiceDesc.Streams[1], TunnelService_Logs_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -157,10 +190,12 @@ func (c *tunnelServiceClient) Disable(ctx context.Context, in *DisableRequest, o
 // for forward compatibility.
 type TunnelServiceServer interface {
 	Status(context.Context, *StatusRequest) (*StatusResponse, error)
+	WatchStatus(*WatchStatusRequest, grpc.ServerStreamingServer[StatusResponse]) error
 	Start(context.Context, *StartRequest) (*StartResponse, error)
 	Stop(context.Context, *StopRequest) (*StopResponse, error)
 	Wait(context.Context, *WaitRequest) (*WaitResponse, error)
 	Create(context.Context, *CreateRequest) (*CreateResponse, error)
+	Update(context.Context, *UpdateRequest) (*UpdateResponse, error)
 	Delete(context.Context, *DeleteRequest) (*DeleteResponse, error)
 	Logs(*LogsRequest, grpc.ServerStreamingServer[LogsResponse]) error
 	Enable(context.Context, *EnableRequest) (*EnableResponse, error)
@@ -178,6 +213,9 @@ type UnimplementedTunnelServiceServer struct{}
 func (UnimplementedTunnelServiceServer) Status(context.Context, *StatusRequest) (*StatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Status not implemented")
 }
+func (UnimplementedTunnelServiceServer) WatchStatus(*WatchStatusRequest, grpc.ServerStreamingServer[StatusResponse]) error {
+	return status.Error(codes.Unimplemented, "method WatchStatus not implemented")
+}
 func (UnimplementedTunnelServiceServer) Start(context.Context, *StartRequest) (*StartResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Start not implemented")
 }
@@ -189,6 +227,9 @@ func (UnimplementedTunnelServiceServer) Wait(context.Context, *WaitRequest) (*Wa
 }
 func (UnimplementedTunnelServiceServer) Create(context.Context, *CreateRequest) (*CreateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Create not implemented")
+}
+func (UnimplementedTunnelServiceServer) Update(context.Context, *UpdateRequest) (*UpdateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Update not implemented")
 }
 func (UnimplementedTunnelServiceServer) Delete(context.Context, *DeleteRequest) (*DeleteResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Delete not implemented")
@@ -240,6 +281,17 @@ func _TunnelService_Status_Handler(srv interface{}, ctx context.Context, dec fun
 	}
 	return interceptor(ctx, in, info, handler)
 }
+
+func _TunnelService_WatchStatus_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(WatchStatusRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(TunnelServiceServer).WatchStatus(m, &grpc.GenericServerStream[WatchStatusRequest, StatusResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type TunnelService_WatchStatusServer = grpc.ServerStreamingServer[StatusResponse]
 
 func _TunnelService_Start_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StartRequest)
@@ -309,6 +361,24 @@ func _TunnelService_Create_Handler(srv interface{}, ctx context.Context, dec fun
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TunnelServiceServer).Create(ctx, req.(*CreateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TunnelService_Update_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TunnelServiceServer).Update(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TunnelService_Update_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TunnelServiceServer).Update(ctx, req.(*UpdateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -406,6 +476,10 @@ var TunnelService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _TunnelService_Create_Handler,
 		},
 		{
+			MethodName: "Update",
+			Handler:    _TunnelService_Update_Handler,
+		},
+		{
 			MethodName: "Delete",
 			Handler:    _TunnelService_Delete_Handler,
 		},
@@ -419,6 +493,11 @@ var TunnelService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "WatchStatus",
+			Handler:       _TunnelService_WatchStatus_Handler,
+			ServerStreams: true,
+		},
 		{
 			StreamName:    "Logs",
 			Handler:       _TunnelService_Logs_Handler,

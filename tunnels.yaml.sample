@@ -6,7 +6,7 @@ tunnels:
       user: user
       host: bastion.example.com
       port: 22
-      identity_key: /home/me/.ssh/id_ed25519
+      identity_key_file: /home/me/.ssh/id_ed25519
       local_forwards:
         - listen_address: 127.0.0.1
           listen_port: 16443
@@ -25,6 +25,9 @@ tunnels:
     restart:
       policy: always
       delay: 5s
+      backoff:
+        multiplier: 2
+        max_delay: 1m
 
   dashboard:
     enabled: true
@@ -32,7 +35,7 @@ tunnels:
     depends_on:
       - bastion
     kubectl:
-      kubeconfig: /etc/tunneld/kubeconfig
+      kubeconfig_file: /etc/tunneld/kubeconfig
       context: production
       namespace: kubernetes-dashboard
       resource: svc/kubernetes-dashboard
@@ -45,9 +48,9 @@ tunnels:
     health:
       type: tcp
       address: 127.0.0.1:8443
-      interval: 5s
-      timeout: 2s
-      startup_timeout: 30s
     restart:
       policy: always
       delay: 5s
+      backoff:
+        multiplier: 2
+        max_delay: 1m

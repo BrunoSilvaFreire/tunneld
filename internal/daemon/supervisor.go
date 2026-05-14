@@ -4,31 +4,36 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
 	"github.com/BrunoSilvaFreire/tunneld/internal/config"
+	"github.com/BrunoSilvaFreire/tunneld/internal/constants"
 	"github.com/BrunoSilvaFreire/tunneld/internal/dependency"
 	"github.com/BrunoSilvaFreire/tunneld/internal/health"
 	"github.com/BrunoSilvaFreire/tunneld/internal/tunnel"
 )
 
 type Supervisor struct {
-	planner   *dependency.Planner
-	processes map[string]*Process
-	config    *config.Config
-	keyDir    string
-	mu        sync.RWMutex
-	ctx       context.Context
+	planner    *dependency.Planner
+	processes  map[string]*Process
+	config     *config.Config
+	keyDir     string
+	tunnelsDir string
+	mu         sync.RWMutex
+	ctx        context.Context
 }
 
-func NewSupervisor(planner *dependency.Planner, cfg *config.Config, keyDir string) *Supervisor {
+func NewSupervisor(planner *dependency.Planner, cfg *config.Config, keyDir, tunnelsDir string) *Supervisor {
 	return &Supervisor{
-		planner:   planner,
-		processes: make(map[string]*Process),
-		config:    cfg,
-		keyDir:    keyDir,
+		planner:    planner,
+		processes:  make(map[string]*Process),
+		config:     cfg,
+		keyDir:     keyDir,
+		tunnelsDir: tunnelsDir,
 	}
 }
 
@@ -37,11 +42,11 @@ func (s *Supervisor) GetKeyDir() string {
 }
 
 func (s *Supervisor) SaveKey(name string, content []byte) error {
-	if err := os.MkdirAll(s.keyDir, 0700); err != nil {
+	if err := os.MkdirAll(s.keyDir, constants.PermDirPrivate); err != nil {
 		return err
 	}
 	keyPath := filepath.Join(s.keyDir, name)
-	return os.WriteFile(keyPath, content, 0600)
+	return os.WriteFile(keyPath, content, constants.PermFilePrivate)
 }
 
 func (s *Supervisor) Run(ctx context.Context) error {
@@ -131,7 +136,7 @@ func (s *Supervisor) checkPortConflicts(spec tunnel.Spec) error {
 	return nil
 }
 
-func (s *Supervisor) AddTunnel(ctx context.Context, spec tunnel.Spec) error {
+func (s *Supervisor) AddTunnel(ctx context.Context, spec tunnel.Spec, persistent bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -141,6 +146,20 @@ func (s *Supervisor) AddTunnel(ctx context.Context, spec tunnel.Spec) error {
 
 	if err := s.checkPortConflicts(spec); err != nil {
 		return err
+	}
+
+	if persistent && s.tunnelsDir != "" {
+		if err := os.MkdirAll(s.tunnelsDir, constants.PermDirPublic); err != nil {
+			return fmt.Errorf("failed to create tunnels directory: %v", err)
+		}
+		path := filepath.Join(s.tunnelsDir, fmt.Sprintf("%s.yaml", spec.Name()))
+		data, err := config.MarshalTunnel(spec.ToProto())
+		if err != nil {
+			return fmt.Errorf("failed to marshal tunnel: %v", err)
+		}
+		if err := os.WriteFile(path, data, constants.PermFilePublic); err != nil {
+			return fmt.Errorf("failed to save tunnel config: %v", err)
+		}
 	}
 
 	s.planner.AddSpec(spec)
@@ -249,6 +268,9 @@ func (s *Supervisor) WaitHealthy(ctx context.Context, name string, timeout time.
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
+	if timeout == 0 {
+		timeout = constants.DefaultWaitTimeout
+	}
 	deadline := time.Now().Add(timeout)
 	for {
 		select {
@@ -287,13 +309,13 @@ func (s *Supervisor) startAndNotify(ctx context.Context, p *Process) error {
 	start := time.Now()
 	timeout := hSpec.GetStartupTimeout().AsDuration()
 	if timeout == 0 {
-		timeout = 30 * time.Second
+		timeout = constants.DefaultStartupTimeout
 	}
 
 	go func() {
 		interval := hSpec.GetInterval().AsDuration()
 		if interval <= 0 {
-			interval = 2 * time.Second
+			interval = constants.DefaultHealthInterval
 		}
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
@@ -309,7 +331,7 @@ func (s *Supervisor) startAndNotify(ctx context.Context, p *Process) error {
 			case <-ticker.C:
 				checkTimeout := hSpec.GetTimeout().AsDuration()
 				if checkTimeout == 0 {
-					checkTimeout = 2 * time.Second
+					checkTimeout = constants.DefaultHealthTimeout
 				}
 				checkCtx, cancel := context.WithTimeout(ctx, checkTimeout)
 				err := h.Check(checkCtx)
@@ -320,6 +342,7 @@ func (s *Supervisor) startAndNotify(ctx context.Context, p *Process) error {
 						log.Printf("[%s] Healthy and running", spec.Name())
 						p.setStatus(tunnel.StatusRunning)
 						p.setError(nil)
+						p.resetRestartAttempts()
 					}
 				} else {
 					if time.Since(start) > timeout {
@@ -347,8 +370,8 @@ func (s *Supervisor) handleFailure(ctx context.Context, name string) {
 
 	log.Printf("[%s] Handling failure...", name)
 
-	if p.ExpectedState() == "stopped" {
-		log.Printf("[%s] Expected state is stopped, skipping restart", name)
+	if p.ExpectedState() == DesiredStopped || p.ExpectedState() == DesiredDisabled {
+		log.Printf("[%s] Expected state is %s, skipping restart", name, p.ExpectedState())
 		return
 	}
 
@@ -370,13 +393,35 @@ func (s *Supervisor) handleFailure(ctx context.Context, name string) {
 
 	// 2. Restart policy
 	policy := p.spec.RestartPolicy()
-	if policy.Policy == "never" {
+	if policy == nil || policy.Policy == "never" {
 		return
 	}
 
-	// Simple restart logic for v1
-	time.Sleep(policy.Delay.AsDuration())
-	log.Printf("[%s] Attempting restart...", name)
+	attempts := p.RestartAttempts()
+	if policy.MaxAttempts > 0 && int32(attempts) >= policy.MaxAttempts {
+		log.Printf("[%s] Max restart attempts (%d) reached", name, policy.MaxAttempts)
+		p.setStatus(tunnel.StatusFailed)
+		p.setError(fmt.Errorf("max restart attempts reached"))
+		return
+	}
+
+	delay := policy.Delay.AsDuration()
+	if policy.Backoff != nil && attempts > 0 {
+		multiplier := policy.Backoff.Multiplier
+		if multiplier <= 0 {
+			multiplier = 2
+		}
+		backoffDelay := time.Duration(float64(delay) * math.Pow(float64(multiplier), float64(attempts)))
+		maxDelay := policy.Backoff.MaxDelay.AsDuration()
+		if maxDelay > 0 && backoffDelay > maxDelay {
+			backoffDelay = maxDelay
+		}
+		delay = backoffDelay
+	}
+
+	log.Printf("[%s] Attempting restart %d in %v...", name, attempts+1, delay)
+	p.incrementRestartAttempts()
+	time.Sleep(delay)
 	if err := s.startAndNotify(ctx, p); err != nil {
 		log.Printf("[%s] Restart failed: %v", name, err)
 	}

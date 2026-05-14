@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"time"
+
+	"github.com/BrunoSilvaFreire/tunneld/internal/constants"
 	"github.com/BrunoSilvaFreire/tunneld/internal/tunnel"
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
 
@@ -37,18 +39,25 @@ type HealthCheckConfig struct {
 }
 
 type RestartPolicyConfig struct {
-	Policy      string        `yaml:"policy"` // always, on-failure, never
-	Delay       time.Duration `yaml:"delay"`
-	MaxAttempts int           `yaml:"max_attempts"`
+	Policy      string         `yaml:"policy"` // always, on-failure, never
+	Delay       time.Duration  `yaml:"delay"`
+	MaxAttempts int            `yaml:"max_attempts"`
+	Backoff     *BackoffConfig `yaml:"backoff,omitempty"`
+}
+
+type BackoffConfig struct {
+	Multiplier float32       `yaml:"multiplier"`
+	MaxDelay   time.Duration `yaml:"max_delay"`
 }
 
 type SSHConfig struct {
-	User          string            `yaml:"user"`
-	Host          string            `yaml:"host"`
-	Port          int               `yaml:"port"`
-	IdentityKey   string            `yaml:"identity_key"`
-	LocalForwards []SSHForward      `yaml:"local_forwards"`
-	Options       map[string]string `yaml:"options"`
+	User            string            `yaml:"user"`
+	Host            string            `yaml:"host"`
+	Port            int               `yaml:"port"`
+	IdentityKeyFile string            `yaml:"identity_key_file,omitempty"`
+	IdentityKeyRef  string            `yaml:"identity_key_ref,omitempty"`
+	LocalForwards   []SSHForward      `yaml:"local_forwards"`
+	Options         map[string]string `yaml:"options"`
 }
 
 type SSHForward struct {
@@ -59,7 +68,8 @@ type SSHForward struct {
 }
 
 type KubectlConfig struct {
-	KubeconfigKey         string           `yaml:"kubeconfig_key"`
+	KubeconfigFile        string           `yaml:"kubeconfig_file,omitempty"`
+	KubeconfigRef         string           `yaml:"kubeconfig_ref,omitempty"`
 	Context               string           `yaml:"context"`
 	Namespace             string           `yaml:"namespace"`
 	Resource              string           `yaml:"resource"`
@@ -99,7 +109,7 @@ func (c *Config) Save() error {
 		return fmt.Errorf("failed to marshal config: %v", err)
 	}
 
-	return os.WriteFile(c.filePath, data, 0644)
+	return os.WriteFile(c.filePath, data, constants.PermFilePublic)
 }
 
 func (c *Config) SetEnabled(name string, enabled bool) error {
@@ -110,6 +120,85 @@ func (c *Config) SetEnabled(name string, enabled bool) error {
 	t.Enabled = enabled
 	c.Tunnels[name] = t
 	return c.Save()
+}
+
+func MarshalTunnel(spec *pb.TunnelSpec) ([]byte, error) {
+	tc := FromProto(spec)
+	return yaml.Marshal(tc)
+}
+
+func FromProto(spec *pb.TunnelSpec) TunnelConfig {
+	tc := TunnelConfig{
+		Enabled:         true,
+		Type:            "",
+		DependsOn:       spec.DependsOn,
+		StartupTimeout:  spec.StartupTimeout.AsDuration(),
+		ShutdownTimeout: spec.ShutdownTimeout.AsDuration(),
+		Health: HealthCheckConfig{
+			Type:           spec.Health.Type,
+			Address:        spec.Health.Address,
+			Interval:       spec.Health.Interval.AsDuration(),
+			Timeout:        spec.Health.Timeout.AsDuration(),
+			StartupTimeout: spec.Health.StartupTimeout.AsDuration(),
+		},
+		Restart: RestartPolicyConfig{
+			Policy:      spec.Restart.Policy,
+			Delay:       spec.Restart.Delay.AsDuration(),
+			MaxAttempts: int(spec.Restart.MaxAttempts),
+		},
+	}
+
+	if spec.Restart.Backoff != nil {
+		tc.Restart.Backoff = &BackoffConfig{
+			Multiplier: spec.Restart.Backoff.Multiplier,
+			MaxDelay:   spec.Restart.Backoff.MaxDelay.AsDuration(),
+		}
+	}
+
+	switch s := spec.Type.(type) {
+	case *pb.TunnelSpec_Ssh:
+		tc.Type = "ssh"
+		forwards := make([]SSHForward, len(s.Ssh.LocalForwards))
+		for i, f := range s.Ssh.LocalForwards {
+			forwards[i] = SSHForward{
+				ListenAddress: f.ListenAddress,
+				ListenPort:    int(f.ListenPort),
+				TargetHost:    f.TargetHost,
+				TargetPort:    int(f.TargetPort),
+			}
+		}
+		tc.SSH = &SSHConfig{
+			User:            s.Ssh.User,
+			Host:            s.Ssh.Host,
+			Port:            int(s.Ssh.Port),
+			IdentityKeyFile: s.Ssh.IdentityKeyFile,
+			IdentityKeyRef:  s.Ssh.IdentityKeyRef,
+			LocalForwards:   forwards,
+			Options:         s.Ssh.Options,
+		}
+	case *pb.TunnelSpec_Kubectl:
+		tc.Type = "kubectl"
+		forwards := make([]KubectlForward, len(s.Kubectl.Forwards))
+		for i, f := range s.Kubectl.Forwards {
+			forwards[i] = KubectlForward{
+				LocalAddress: f.LocalAddress,
+				LocalPort:    int(f.LocalPort),
+				RemotePort:   int(f.RemotePort),
+			}
+		}
+		tc.Kubectl = &KubectlConfig{
+			KubeconfigFile:        s.Kubectl.KubeconfigFile,
+			KubeconfigRef:         s.Kubectl.KubeconfigRef,
+			Context:               s.Kubectl.Context,
+			Namespace:             s.Kubectl.Namespace,
+			Resource:              s.Kubectl.Resource,
+			Forwards:              forwards,
+			APIServer:             s.Kubectl.ApiServer,
+			InsecureSkipTLSVerify: s.Kubectl.InsecureSkipTlsVerify,
+		}
+	}
+
+	return tc
 }
 
 func (t *TunnelConfig) ToProto(name string) (*pb.TunnelSpec, error) {
@@ -132,6 +221,13 @@ func (t *TunnelConfig) ToProto(name string) (*pb.TunnelSpec, error) {
 		},
 	}
 
+	if t.Restart.Backoff != nil {
+		p.Restart.Backoff = &pb.BackoffSpec{
+			Multiplier: t.Restart.Backoff.Multiplier,
+			MaxDelay:   durationpb.New(t.Restart.Backoff.MaxDelay),
+		}
+	}
+
 	switch t.Type {
 	case "ssh":
 		if t.SSH == nil {
@@ -148,12 +244,13 @@ func (t *TunnelConfig) ToProto(name string) (*pb.TunnelSpec, error) {
 		}
 		p.Type = &pb.TunnelSpec_Ssh{
 			Ssh: &pb.SSHSpec{
-				User:          t.SSH.User,
-				Host:          t.SSH.Host,
-				Port:          int32(t.SSH.Port),
-				IdentityKey:   t.SSH.IdentityKey,
-				LocalForwards: forwards,
-				Options:       t.SSH.Options,
+				User:            t.SSH.User,
+				Host:            t.SSH.Host,
+				Port:            int32(t.SSH.Port),
+				IdentityKeyFile: t.SSH.IdentityKeyFile,
+				IdentityKeyRef:  t.SSH.IdentityKeyRef,
+				LocalForwards:   forwards,
+				Options:         t.SSH.Options,
 			},
 		}
 	case "kubectl":
@@ -170,7 +267,8 @@ func (t *TunnelConfig) ToProto(name string) (*pb.TunnelSpec, error) {
 		}
 		p.Type = &pb.TunnelSpec_Kubectl{
 			Kubectl: &pb.KubectlSpec{
-				KubeconfigKey:         t.Kubectl.KubeconfigKey,
+				KubeconfigFile:        t.Kubectl.KubeconfigFile,
+				KubeconfigRef:         t.Kubectl.KubeconfigRef,
 				Context:               t.Kubectl.Context,
 				Namespace:             t.Kubectl.Namespace,
 				Resource:              t.Kubectl.Resource,

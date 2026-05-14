@@ -13,32 +13,42 @@ import (
 	"sync"
 	"time"
 
+	"github.com/BrunoSilvaFreire/tunneld/internal/constants"
 	"github.com/BrunoSilvaFreire/tunneld/internal/tunnel"
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
 	"google.golang.org/protobuf/proto"
 )
 
+type ExpectedState string
+
+const (
+	DesiredRunning  ExpectedState = "running"
+	DesiredStopped  ExpectedState = "stopped"
+	DesiredDisabled ExpectedState = "disabled"
+)
+
 type Process struct {
-	spec          tunnel.Spec
-	cmd           *exec.Cmd
-	status        tunnel.Status
-	lastError     error
-	mu            sync.RWMutex
-	cancel        context.CancelFunc
-	waitCh        chan error
-	logPath       string
-	expectedState string
-	keyDir        string
-	portMappings  []tunnel.PortMapping
+	spec            tunnel.Spec
+	cmd             *exec.Cmd
+	status          tunnel.Status
+	lastError       error
+	mu              sync.RWMutex
+	cancel          context.CancelFunc
+	waitCh          chan error
+	logPath         string
+	expectedState   ExpectedState
+	keyDir          string
+	portMappings    []tunnel.PortMapping
+	restartAttempts int
 }
 
 func NewProcess(spec tunnel.Spec, keyDir string) *Process {
-	logDir := filepath.Join(os.TempDir(), "tunneld-logs")
+	logDir := filepath.Join(os.TempDir(), constants.LogDirPrefix)
 	return &Process{
 		spec:          spec,
 		status:        tunnel.StatusStopped,
 		logPath:       filepath.Join(logDir, fmt.Sprintf("%s.log", spec.Name())),
-		expectedState: "stopped",
+		expectedState: DesiredStopped,
 		keyDir:        keyDir,
 	}
 }
@@ -49,7 +59,7 @@ func (p *Process) Status() tunnel.Status {
 	return p.status
 }
 
-func (p *Process) ExpectedState() string {
+func (p *Process) ExpectedState() ExpectedState {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.expectedState
@@ -67,7 +77,7 @@ func (p *Process) setStatus(s tunnel.Status) {
 	p.status = s
 }
 
-func (p *Process) setExpectedState(s string) {
+func (p *Process) setExpectedState(s ExpectedState) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.expectedState = s
@@ -79,23 +89,41 @@ func (p *Process) setError(err error) {
 	p.lastError = err
 }
 
+func (p *Process) RestartAttempts() int {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.restartAttempts
+}
+
+func (p *Process) incrementRestartAttempts() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.restartAttempts++
+}
+
+func (p *Process) resetRestartAttempts() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.restartAttempts = 0
+}
+
 func (p *Process) Start(ctx context.Context) error {
 	p.mu.Lock()
 	if p.status != tunnel.StatusStopped && p.status != tunnel.StatusFailed {
 		p.mu.Unlock()
 		return fmt.Errorf("process already running")
 	}
-	p.expectedState = "running"
+	p.expectedState = DesiredRunning
 	p.mu.Unlock()
 
 	// Ensure log directory exists
 	logDir := filepath.Dir(p.logPath)
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, constants.PermDirPublic); err != nil {
 		return fmt.Errorf("failed to create log directory: %v", err)
 	}
 
 	// Open log file in append mode
-	logFile, err := os.OpenFile(p.logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	logFile, err := os.OpenFile(p.logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, constants.PermFilePublic)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %v", err)
 	}
@@ -173,7 +201,7 @@ func (p *Process) Start(ctx context.Context) error {
 }
 
 func (p *Process) Stop() error {
-	p.setExpectedState("stopped")
+	p.setExpectedState(DesiredStopped)
 	if p.cancel != nil {
 		p.cancel()
 	}

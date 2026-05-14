@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BrunoSilvaFreire/tunneld/internal/constants"
 	"github.com/BrunoSilvaFreire/tunneld/internal/daemon"
 	"github.com/BrunoSilvaFreire/tunneld/internal/tunnel"
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
@@ -62,6 +63,56 @@ func (s *TunnelServer) Status(ctx context.Context, req *pb.StatusRequest) (*pb.S
 	}
 
 	return &pb.StatusResponse{Tunnels: tunnels}, nil
+}
+
+// WatchStatus streams the current status of one or all tunnels on a periodic
+// tick. The first frame is sent immediately so clients have a baseline; after
+// that, frames arrive at the requested interval until the client disconnects.
+//
+// This is a simple polling stream rather than an event subscription — the
+// supervisor exposes no event channel today, and polling once per cadence is
+// cheap enough (a map iteration under a mutex) for the scale we care about.
+// Migrating to push semantics is additive when needed.
+func (s *TunnelServer) WatchStatus(req *pb.WatchStatusRequest, stream pb.TunnelService_WatchStatusServer) error {
+	interval := time.Duration(req.IntervalMs) * time.Millisecond
+	switch {
+	case interval <= 0:
+		interval = 2 * time.Second
+	case interval < 200*time.Millisecond:
+		interval = 200 * time.Millisecond
+	case interval > 60*time.Second:
+		interval = 60 * time.Second
+	}
+
+	send := func() error {
+		resp, err := s.Status(stream.Context(), &pb.StatusRequest{Name: req.Name})
+		if err != nil {
+			// NotFound is non-fatal for an unfiltered stream — the tunnel may
+			// appear later. Translate to an empty frame and keep streaming.
+			if status.Code(err) == codes.NotFound && req.Name == "" {
+				return stream.Send(&pb.StatusResponse{})
+			}
+			return err
+		}
+		return stream.Send(resp)
+	}
+
+	if err := send(); err != nil {
+		return err
+	}
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-stream.Context().Done():
+			return stream.Context().Err()
+		case <-ticker.C:
+			if err := send(); err != nil {
+				return err
+			}
+		}
+	}
 }
 
 func (s *TunnelServer) Logs(req *pb.LogsRequest, stream pb.TunnelService_LogsServer) error {
@@ -141,7 +192,7 @@ func (s *TunnelServer) Disable(ctx context.Context, req *pb.DisableRequest) (*pb
 func (s *TunnelServer) Wait(ctx context.Context, req *pb.WaitRequest) (*pb.WaitResponse, error) {
 	timeout := time.Duration(req.TimeoutSeconds) * time.Second
 	if timeout == 0 {
-		timeout = 30 * time.Second
+		timeout = constants.DefaultWaitTimeout
 	}
 
 	st, err := s.supervisor.WaitHealthy(ctx, req.Name, timeout)
@@ -174,7 +225,7 @@ func (s *TunnelServer) Create(ctx context.Context, req *pb.CreateRequest) (*pb.C
 		return nil, status.Errorf(codes.InvalidArgument, "invalid spec: %v", err)
 	}
 
-	if err := s.supervisor.AddTunnel(ctx, spec); err != nil {
+	if err := s.supervisor.AddTunnel(ctx, spec, req.Persistent); err != nil {
 		// If it already exists, check if we should fail or just return success
 		if strings.Contains(err.Error(), "already exists") {
 			// In a real system, we might check if specs match.
@@ -185,6 +236,33 @@ func (s *TunnelServer) Create(ctx context.Context, req *pb.CreateRequest) (*pb.C
 	}
 
 	return &pb.CreateResponse{}, nil
+}
+
+func (s *TunnelServer) Update(ctx context.Context, req *pb.UpdateRequest) (*pb.UpdateResponse, error) {
+	if req.Spec == nil {
+		return nil, status.Error(codes.InvalidArgument, "spec is required")
+	}
+
+	for name, content := range req.InlineKeys {
+		if err := s.supervisor.SaveKey(name, content); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to save inline key %q: %v", name, err)
+		}
+	}
+
+	spec, err := tunnel.FromProto(req.Spec)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid spec: %v", err)
+	}
+
+	// Remove if present, then add. RemoveTunnel is a no-op equivalent for missing names
+	// (it returns an error we tolerate) so Update doubles as Create-or-Update.
+	_ = s.supervisor.RemoveTunnel(spec.Name())
+
+	if err := s.supervisor.AddTunnel(ctx, spec, req.Persistent); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &pb.UpdateResponse{}, nil
 }
 
 func (s *TunnelServer) Delete(ctx context.Context, req *pb.DeleteRequest) (*pb.DeleteResponse, error) {

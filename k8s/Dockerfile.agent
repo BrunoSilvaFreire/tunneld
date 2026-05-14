@@ -1,0 +1,15 @@
+# syntax=docker/dockerfile:1
+FROM golang:1.26-alpine AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH:-amd64} \
+    go build -trimpath -ldflags "-s -w" -o /out/tunneld-agent ./cmd/tunneld-agent
+
+# The agent dials a Unix socket and reads Secrets — it needs no shell or tooling.
+FROM gcr.io/distroless/static:nonroot
+COPY --from=build /out/tunneld-agent /usr/local/bin/tunneld-agent
+USER 65532:65532
+ENTRYPOINT ["/usr/local/bin/tunneld-agent"]

@@ -1,56 +1,53 @@
-# Tunneld
-*(Pronounced "tunneled")*
+# tunneld
 
-[![Build](https://github.com/BrunoSilvaFreire/tunneld/actions/workflows/build.yml/badge.svg)](https://github.com/BrunoSilvaFreire/tunneld/actions/workflows/build.yml)
+Keep chained SSH and kubectl port-forward tunnels alive.
+
+`tunneld` is a dependency-aware tunnel supervisor. It keeps chains of local tunnels alive, resolving the "brittle tunnel" problem where network interruptions, VPN reconnects, or host sleep cycles break your development infrastructure.
+
+Use it instead of fragile shell scripts, tmux panes, or `autossh` glue when:
+- **You access private Kubernetes clusters through a bastion host.**
+- **Your kubectl port-forward depends on an SSH tunnel.**
+- **You want a robust daemon + CLI** instead of raw shell process management.
+- **You need automatic health gates** and cascading failure recovery.
+
+[![Build](https://github.com/BrunoSilvaFreire/tunneld/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/BrunoSilvaFreire/tunneld/actions/workflows/build.yml)
 [![Release](https://github.com/BrunoSilvaFreire/tunneld/actions/workflows/release.yml/badge.svg)](https://github.com/BrunoSilvaFreire/tunneld/actions/workflows/release.yml)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/BrunoSilvaFreire/tunneld)](https://github.com/BrunoSilvaFreire/tunneld/blob/main/go.mod)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/BrunoSilvaFreire/tunneld)](https://github.com/BrunoSilvaFreire/tunneld/blob/master/go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-Persistent tunnel supervisor for SSH and Kubernetes port-forwards. Manages chained tunnel dependencies, health checks,
-and lifecycle automation via a gRPC API.
 
 ---
 
-## Why Tunneld?
+## The Killer Difference: Why not `autossh`?
 
-Manually maintaining a chain of SSH local forwards (`-L`) and `kubectl port-forward` sessions is brittle. Network
-interruptions, host sleep cycles, or upstream restarts break the chain and require manual intervention to re-establish
-connectivity in the correct order.
+`autossh` keeps one SSH process alive. **`tunneld` supervises a graph of tunnels.**
 
-Tunneld replaces manual tunnel management with a declarative configuration model. Tunnels are defined as nodes in a
-Directed Acyclic Graph (DAG). The supervisor resolves startup order topologically, gates dependent tunnels on upstream
-health checks, and propagates failure downstream — automatically restarting or terminating tunnels according to their
-configured policies.
+| Feature | `autossh` | `tunneld` |
+|---------|-----------|-----------|
+| **Persistent Process** | ✅ | ✅ |
+| **Dependency-Ordered Startup** | ❌ | ✅ |
+| **TCP Health Gates** | ❌ | ✅ |
+| **Cascading Downstream Stops** | ❌ | ✅ |
+| **Kubectl Port-Forward Native** | ❌ | ✅ |
+| **Programmatic gRPC/CLI Control** | ❌ | ✅ |
 
-## Use Case: Chained Port-Forwarding
+`tunneld` ensures that if your bastion SSH tunnel goes down, your dependent `kubectl port-forward` is stopped immediately and only restarted once the bastion is healthy again.
 
-Consider accessing a Kubernetes service through a bastion host:
-
-1. An SSH tunnel exposes the Kubernetes API server on a local port.
-2. A `kubectl port-forward` targets a service through that local API endpoint.
-
-Without a supervisor, the second tunnel fails if the first is not yet ready, or if the SSH session drops and the local
-port disappears. Tunneld models this as a dependency: the `kubectl` tunnel declares `depends_on: [bastion]`. The
-supervisor ensures the SSH tunnel passes its TCP health probe before starting the `kubectl` tunnel, and stops the
-latter if the former becomes unhealthy.
-
-| Tool | Persistent | Dependencies | Health Checks | K8s Port-Forward | Programmatic API |
-|------|-----------|-------------|---------------|------------------|------------------|
-| `autossh` | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `sshuttle` | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `kubectl port-forward` (raw) | ❌ | ❌ | ❌ | ✅ | ❌ |
-| **Tunneld** | ✅ | ✅ | ✅ | ✅ | ✅ |
+---
 
 ## Features
 
-- **Declarative Tunnels** — Manage SSH (`-L`) and Kubernetes port-forwards via YAML.
-- **Smart Dependencies** — DAG-based startup order with automatic cascading stop on failure.
+- **Persistent SSH & Kubectl** — Keep local forwards and port-forwards alive across disconnects.
+- **Smart Dependencies** — Define your infrastructure as a graph; `tunneld` handles the ordering.
 - **Health Checks** — Built-in TCP probes ensure a tunnel is truly ready before starting dependents.
-- **Auto-Restart** — Configurable restart policies (`always`, `on-failure`, `never`) with backoff.
-- **gRPC API** — Programmatic control for automation pipelines, custom scripts, or infrastructure-as-code.
-- **CLI Client (`tunnelctl`)** — Intuitive day-to-day operations with built-in bash completion.
+- **Exponential Backoff** — Smart retry logic with configurable multipliers and maximum delays.
+- **gRPC API** — Programmatic control for automation, Pulumi, or Argo Workflows.
+- **CLI Client (`tunnelctl`)** — Powerful control with `status`, `logs`, `start/stop`, and `load`.
 - **Ansible Collection** — Declarative tunnel management from your playbooks.
-- **Docker Images** — Pre-built images published to GitHub Container Registry.
+
+## Demo
+
+![tunneld demo](docs/demo.gif)
+*(Asciinema/GIF showing `tunnelctl status` and automatic recovery when an upstream tunnel is killed)*
 
 ## Quick Start
 
@@ -59,66 +56,50 @@ latter if the former becomes unhealthy.
 docker pull ghcr.io/brunosilvafreire/tunneld:latest
 docker pull ghcr.io/brunosilvafreire/tunnelctl:latest
 
-# Start the daemon (see Configuration below for tunnels.yaml)
+# Start the daemon
 docker run -d \
   --name tunneld \
   -v $(pwd)/tunnels.yaml:/etc/tunneld/tunnels.yaml:ro \
-  -v /tmp/tunneld.sock:/tmp/tunneld.sock \
-  ghcr.io/brunosilvafreire/tunneld:latest \
-  --config /etc/tunneld/tunnels.yaml run
+  -v /run/tunneld/tunneld.sock:/run/tunneld/tunneld.sock \
+  ghcr.io/brunosilvafreire/tunneld:latest
 
 # Check status
-docker run --rm \
-  -v /tmp/tunneld.sock:/tmp/tunneld.sock \
-  ghcr.io/brunosilvafreire/tunnelctl:latest status
+tunnelctl status
 ```
 
 ## Installation
 
-### Download a Release
-
-The latest `.deb` (Debian/Ubuntu) and `.zip` assets are attached to each
-[GitHub Release](https://github.com/BrunoSilvaFreire/tunneld/releases).
+### Binary Installation (Linux)
 
 ```bash
-# Fetch the download URL for the latest amd64 .deb from the GitHub API
-DEB_URL=$(curl -s https://api.github.com/repos/BrunoSilvaFreire/tunneld/releases/latest \
-  | grep "browser_download_url.*_amd64.deb" \
-  | cut -d '"' -f 4)
-
-# Download and install
-curl -sL "$DEB_URL" -o tunneld_latest.deb
-sudo dpkg -i tunneld_latest.deb
+# Download and install the latest .deb
+curl -fsSL https://github.com/BrunoSilvaFreire/tunneld/releases/latest/download/tunneld_amd64.deb -o tunneld.deb
+sudo dpkg -i tunneld.deb
+sudo systemctl enable --now tunneld
 ```
 
-### Docker / GitHub Container Registry
-
-Multi-arch images are published to GHCR for every release:
+### Docker
 
 ```bash
-# Run the daemon
 docker run --rm -v $(pwd)/tunnels.yaml:/etc/tunneld/tunnels.yaml \
-  ghcr.io/brunosilvafreire/tunneld:latest \
-  --config /etc/tunneld/tunnels.yaml run
-
-# Run the CLI
-docker run --rm -v /tmp/tunneld.sock:/tmp/tunneld.sock \
-  ghcr.io/brunosilvafreire/tunnelctl:latest status
+  ghcr.io/brunosilvafreire/tunneld:latest
 ```
 
-### Build from Source
+### Kubernetes
 
-Requires Go 1.26+:
+A controller + per-node agent expose tunnels as Kubernetes `Service`s via three
+CRDs (`Tunnel`, `TunnelGroup`, `TunnelKey`). One-shot install:
 
 ```bash
-make build
-sudo make package-deb
-sudo dpkg -i tunneld_*_amd64.deb
+kubectl apply -k k8s/config/default
 ```
+
+See [docs/kubernetes.md](docs/kubernetes.md) for deployment modes (host-installed
+vs DaemonSet-bundled tunneld), networking notes, and example manifests.
 
 ## Configuration
 
-Tunnels are defined in a YAML file. Each tunnel declares its type (`ssh` or `kubectl`), health check parameters, restart policy, and optionally a list of dependencies.
+Tunnels are defined in YAML. `tunneld` distinguishes between absolute file paths (`*_file`) and daemon-managed keys (`*_ref`).
 
 ### Example: Bastion → Kubernetes Dashboard
 
@@ -131,7 +112,7 @@ tunnels:
       user: user
       host: bastion.example.com
       port: 22
-      identity_key: /var/lib/tunneld/keys/id_ed25519
+      identity_key_file: /home/user/.ssh/id_ed25519
       local_forwards:
         - listen_address: 127.0.0.1
           listen_port: 16443
@@ -146,6 +127,9 @@ tunnels:
     restart:
       policy: always
       delay: 5s
+      backoff:
+        multiplier: 2
+        max_delay: 1m
 
   dashboard:
     enabled: true
@@ -153,7 +137,7 @@ tunnels:
     depends_on:
       - bastion
     kubectl:
-      kubeconfig: /etc/tunneld/kubeconfig
+      kubeconfig_ref: prod-kubeconfig # Managed by tunneld
       context: production
       namespace: kubernetes-dashboard
       resource: svc/kubernetes-dashboard
@@ -166,113 +150,40 @@ tunnels:
     health:
       type: tcp
       address: 127.0.0.1:8443
-      interval: 5s
-      timeout: 2s
-      startup_timeout: 30s
     restart:
       policy: always
-      delay: 5s
-```
-
-### Docker Compose
-
-For a persistent container deployment:
-
-```yaml
-services:
-  tunneld:
-    image: ghcr.io/brunosilvafreire/tunneld:latest
-    command: ["--config", "/etc/tunneld/tunnels.yaml", "run"]
-    volumes:
-      - ./tunnels.yaml:/etc/tunneld/tunnels.yaml:ro
-      - ~/.ssh/id_ed25519:/var/lib/tunneld/keys/id_ed25519:ro
-      - ./kubeconfig:/etc/tunneld/kubeconfig:ro
-      - tunneld-socket:/tmp
-
-  tunnelctl:
-    image: ghcr.io/brunosilvafreire/tunnelctl:latest
-    profiles: ["cli"]
-    volumes:
-      - tunneld-socket:/tmp
-    entrypoint: ["/usr/local/bin/tunnelctl"]
-    command: ["status"]
-
-volumes:
-  tunneld-socket:
-```
-
-```bash
-docker compose up -d tunneld
-docker compose run --rm tunnelctl status
+      delay: 2s
 ```
 
 ## CLI Cheat Sheet
 
 ```bash
-# Daemon
-tunneld --config tunnels.yaml run          # Start the supervisor
-
-# Status & Control
 tunnelctl status                           # List all tunnels
-tunnelctl status dashboard                 # Show one tunnel
-tunnelctl logs dashboard                   # Stream logs
-tunnelctl logs dashboard --follow          # Follow logs in real time
-
-# Lifecycle
-tunnelctl start dashboard                  # Start a tunnel
-tunnelctl stop dashboard                   # Stop a tunnel
-tunnelctl wait dashboard --timeout 60      # Wait until healthy
-
-# Management
-tunnelctl create my-tunnel --config spec.yaml   # Create from YAML
-tunnelctl delete my-tunnel                      # Remove a tunnel
-tunnelctl enable my-tunnel                      # Mark as enabled
-tunnelctl disable my-tunnel                     # Mark as disabled
-tunnelctl load --config tunnels.yaml            # Bulk load definitions
-
-# SSH Keys
-tunnelctl key add my-key --file ~/.ssh/id_rsa   # Upload a key
-tunnelctl key list                                # List uploaded keys
-tunnelctl key delete my-key                       # Remove a key
+tunnelctl logs dashboard --follow          # Stream logs
+tunnelctl wait dashboard                   # Wait until healthy
+tunnelctl create my-tunnel --config spec.yaml --persistent
+tunnelctl key add my-key --file ~/.ssh/id_rsa
 ```
 
-## Automation & Integrations
+## Security Model
 
-### gRPC API
+`tunneld` is designed to run as a system daemon (user `tunneld`).
+- **Socket Permissions:** The gRPC socket at `/run/tunneld/tunneld.sock` should be restricted to the `tunneld` group.
+- **Key Storage:** Keys uploaded via `tunnelctl key add` are stored in `/var/lib/tunneld/keys` with `0600` permissions, owned by the `tunneld` user.
+- **Process Isolation:** Tunnels run as sub-processes of the daemon.
 
-Tunneld exposes a gRPC API over a Unix domain socket (default `/tmp/tunneld.sock`). The protobuf definitions live in
-`api/v1/`. This makes it easy to integrate with Pulumi, Argo Workflows, or any custom automation that needs to spin up
-tunnels on demand.
+## Project Status
 
-### Ansible
+`tunneld` is early but usable.
 
-An Ansible collection is included in the `ansible/` directory. See [ansible/README.md](ansible/README.md) for
-installation and usage.
+**Current supported tunnel types:**
+- SSH local forwards (`-L`)
+- `kubectl port-forward`
 
-```bash
-ansible-galaxy collection install git+https://github.com/BrunoSilvaFreire/tunneld.git#/ansible
-```
-
-## Architecture at a Glance
-
-- **Dependency Graph** — Tunnels are nodes in a DAG. A topological planner determines startup order using Kahn's
-  algorithm.
-- **Health Gates** — Before a dependent tunnel starts, its upstream must pass a configurable TCP health check.
-- **Cascading Restarts** — If a tunnel fails, a reverse BFS identifies every downstream dependent and stops them
-  cleanly. When the parent recovers, the chain restarts automatically.
-- **Protobuf-First** — All configuration and status messages are defined in `.proto` files, ensuring type fidelity
-  across the daemon, CLI, and any external consumers.
-
-## Development
-
-```bash
-make build        # Build tunneld and tunnelctl
-make test         # Run the test suite
-make proto        # Regenerate protobuf code (requires protoc, protoc-gen-go, protoc-gen-go-grpc)
-make package-deb  # Build a .deb package
-make package-zip  # Build a .zip archive
-make clean        # Remove build artifacts
-```
+**Known limitations:**
+- No reverse SSH forwarding (`-R`) yet.
+- No SOCKS proxy (`-D`) yet.
+- No Windows service support yet.
 
 ## License
 
