@@ -94,6 +94,7 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     permissions:
+      contents: read
       packages: write
     steps:
       - name: Checkout code
@@ -131,6 +132,28 @@ jobs:
             ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunnelctl:${{ needs.metadata.outputs.tag }}-${{ matrix.arch }}
             ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunnelctl:latest-${{ matrix.arch }}
 
+      - name: Build and push tunneld-controller
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: k8s/Dockerfile.controller
+          platforms: linux/${{ matrix.arch }}
+          push: true
+          tags: |
+            ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld-controller:${{ needs.metadata.outputs.tag }}-${{ matrix.arch }}
+            ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld-controller:latest-${{ matrix.arch }}
+
+      - name: Build and push tunneld-agent
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: k8s/Dockerfile.agent
+          platforms: linux/${{ matrix.arch }}
+          push: true
+          tags: |
+            ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld-agent:${{ needs.metadata.outputs.tag }}-${{ matrix.arch }}
+            ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld-agent:latest-${{ matrix.arch }}
+
   manifest:
     name: Create Multi-Arch Manifests
     needs: [metadata, build-docker]
@@ -161,9 +184,93 @@ jobs:
             ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunnelctl:${{ needs.metadata.outputs.tag }}-amd64 \
             ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunnelctl:${{ needs.metadata.outputs.tag }}-arm64
 
+      - name: Create and push tunneld-controller manifest
+        run: |
+          docker buildx imagetools create \
+            -t ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld-controller:${{ needs.metadata.outputs.tag }} \
+            -t ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld-controller:latest \
+            ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld-controller:${{ needs.metadata.outputs.tag }}-amd64 \
+            ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld-controller:${{ needs.metadata.outputs.tag }}-arm64
+
+      - name: Create and push tunneld-agent manifest
+        run: |
+          docker buildx imagetools create \
+            -t ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld-agent:${{ needs.metadata.outputs.tag }} \
+            -t ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld-agent:latest \
+            ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld-agent:${{ needs.metadata.outputs.tag }}-amd64 \
+            ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld-agent:${{ needs.metadata.outputs.tag }}-arm64
+
+  build-helm:
+    name: Package Helm Chart
+    needs: metadata
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Package chart
+        run: |
+          mkdir -p chart-artifacts
+          helm package k8s/charts/tunneld-operator \
+            --version "${{ needs.metadata.outputs.version }}" \
+            --app-version "${{ needs.metadata.outputs.version }}" \
+            --destination chart-artifacts
+
+      - name: Upload chart
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-chart
+          path: chart-artifacts/*.tgz
+
+  kubernetes-e2e:
+    name: Kubernetes E2E
+    needs: metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Set up kind
+        uses: helm/kind-action@v1
+        with:
+          install_only: true
+
+      - name: Run Kubernetes e2e
+        run: make e2e-k8s
+        env:
+          GONOSUMDB: github.com/BrunoSilvaFreire
+          CLUSTER_NAME: tunneld-release-e2e
+          IMAGE_TAG: ${{ needs.metadata.outputs.tag }}
+          TUNNELD_IMAGE: ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld-ci
+          CONTROLLER_IMAGE: ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld-ci-controller
+          AGENT_IMAGE: ghcr.io/${{ needs.metadata.outputs.owner_lc }}/tunneld-ci-agent
+
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-kubernetes-e2e-diagnostics
+          path: e2e-artifacts
+          if-no-files-found: ignore
+
   publish:
     name: Publish Release
-    needs: [metadata, build-artifacts, manifest]
+    needs: [metadata, build-artifacts, build-helm, kubernetes-e2e, manifest]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -175,7 +282,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          pattern: release-artifacts-*
+          pattern: release-*
           merge-multiple: true
 
       - name: Create GitHub Release

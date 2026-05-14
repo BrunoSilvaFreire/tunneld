@@ -1,4 +1,4 @@
-.PHONY: all build test clean proto package-deb package-zip setup-local setup-remote build-k8s generate-k8s image-controller image-agent
+.PHONY: all build test clean proto package-deb package-zip setup-local setup-remote build-k8s generate-k8s image-controller image-agent e2e-k8s
 
 BINARY_TUNNELD=tunneld
 BINARY_TUNNELCTL=tunnelctl
@@ -44,6 +44,9 @@ image-controller:
 
 image-agent:
 	docker build -f k8s/Dockerfile.agent -t $(IMAGE_REGISTRY)/$(BINARY_AGENT):$(IMAGE_TAG) .
+
+e2e-k8s:
+	scripts/e2e/kubernetes.sh
 
 test:
 	go test -coverprofile=coverage.out -covermode=atomic ./...

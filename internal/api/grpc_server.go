@@ -15,6 +15,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 type TunnelServer struct {
@@ -252,6 +253,19 @@ func (s *TunnelServer) Update(ctx context.Context, req *pb.UpdateRequest) (*pb.U
 	spec, err := tunnel.FromProto(req.Spec)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid spec: %v", err)
+	}
+
+	for _, info := range s.supervisor.ListTunnels() {
+		if info.Name != spec.Name() {
+			continue
+		}
+		if proto.Equal(info.Spec.ToProto(), spec.ToProto()) {
+			if err := s.supervisor.StartTunnel(ctx, spec.Name()); err != nil {
+				return nil, status.Error(codes.Internal, err.Error())
+			}
+			return &pb.UpdateResponse{}, nil
+		}
+		break
 	}
 
 	// Remove if present, then add. RemoveTunnel is a no-op equivalent for missing names

@@ -18,6 +18,9 @@ spec:
         app.kubernetes.io/name: tunneld-agent
     spec:
       serviceAccountName: tunneld-agent
+      securityContext:
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       tolerations:
@@ -35,6 +38,8 @@ spec:
             - { name: tunneld-keys,   mountPath: /var/lib/tunneld/keys }
           securityContext:
             allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 65532
             capabilities: { drop: [ALL] }
         - name: agent
           image: ghcr.io/brunosilvafreire/tunneld-agent:latest

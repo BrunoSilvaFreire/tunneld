@@ -22,6 +22,9 @@ spec:
     spec:
       serviceAccountName: tunneld-agent
       {{- if eq .Values.mode "daemonset" }}
+      securityContext:
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       {{- end }}
@@ -53,6 +56,8 @@ spec:
             - { name: tunneld-keys,   mountPath: /var/lib/tunneld/keys }
           securityContext:
             allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 65532
             capabilities: { drop: [ALL] }
         {{- end }}
         - name: agent

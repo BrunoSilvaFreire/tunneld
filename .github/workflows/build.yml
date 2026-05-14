@@ -20,6 +20,9 @@ jobs:
           go-version: '1.26'
           cache: true
 
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
       - name: Install dependencies
         run: go mod download
         env:
@@ -27,6 +30,20 @@ jobs:
 
       - name: Run tests
         run: make test
+        env:
+          GONOSUMDB: github.com/BrunoSilvaFreire
+
+      - name: Build Kubernetes binaries
+        run: make build-k8s
+        env:
+          GONOSUMDB: github.com/BrunoSilvaFreire
+
+      - name: Validate Kubernetes images and chart
+        run: |
+          docker build -f k8s/Dockerfile.controller -t tunneld-controller:ci .
+          docker build -f k8s/Dockerfile.agent -t tunneld-agent:ci .
+          helm template tunneld ./k8s/charts/tunneld-operator --set mode=host-installed >/tmp/tunneld-host-installed.yaml
+          helm template tunneld ./k8s/charts/tunneld-operator --set mode=daemonset >/tmp/tunneld-daemonset.yaml
         env:
           GONOSUMDB: github.com/BrunoSilvaFreire
 

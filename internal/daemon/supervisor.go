@@ -138,26 +138,29 @@ func (s *Supervisor) checkPortConflicts(spec tunnel.Spec) error {
 
 func (s *Supervisor) AddTunnel(ctx context.Context, spec tunnel.Spec, persistent bool) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if _, ok := s.processes[spec.Name()]; ok {
+		s.mu.Unlock()
 		return fmt.Errorf("tunnel %q already exists", spec.Name())
 	}
 
 	if err := s.checkPortConflicts(spec); err != nil {
+		s.mu.Unlock()
 		return err
 	}
 
 	if persistent && s.tunnelsDir != "" {
 		if err := os.MkdirAll(s.tunnelsDir, constants.PermDirPublic); err != nil {
+			s.mu.Unlock()
 			return fmt.Errorf("failed to create tunnels directory: %v", err)
 		}
 		path := filepath.Join(s.tunnelsDir, fmt.Sprintf("%s.yaml", spec.Name()))
 		data, err := config.MarshalTunnel(spec.ToProto())
 		if err != nil {
+			s.mu.Unlock()
 			return fmt.Errorf("failed to marshal tunnel: %v", err)
 		}
 		if err := os.WriteFile(path, data, constants.PermFilePublic); err != nil {
+			s.mu.Unlock()
 			return fmt.Errorf("failed to save tunnel config: %v", err)
 		}
 	}
@@ -165,10 +168,18 @@ func (s *Supervisor) AddTunnel(ctx context.Context, spec tunnel.Spec, persistent
 	s.planner.AddSpec(spec)
 	if _, err := s.planner.Plan(); err != nil {
 		s.planner.RemoveSpec(spec.Name())
+		s.mu.Unlock()
 		return fmt.Errorf("invalid dependencies: %v", err)
 	}
 
-	s.processes[spec.Name()] = NewProcess(spec, s.keyDir)
+	p := NewProcess(spec, s.keyDir)
+	s.processes[spec.Name()] = p
+	runCtx := s.ctx
+	s.mu.Unlock()
+
+	if runCtx != nil {
+		return s.startAndNotify(runCtx, p)
+	}
 	return nil
 }
 
