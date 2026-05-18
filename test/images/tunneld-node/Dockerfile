@@ -1,3 +1,15 @@
+FROM golang:1.26-alpine AS build
+
+WORKDIR /src
+ENV GONOSUMDB=github.com/BrunoSilvaFreire
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 go build -o /out/tunneld ./cmd/tunneld/main.go && \
+    CGO_ENABLED=0 go build -o /out/tunnelctl ./cmd/tunnelctl/main.go
+
 FROM alpine:3.20
 
 ARG TARGETARCH
@@ -21,6 +33,6 @@ RUN arch="${TARGETARCH:-amd64}"; \
     curl -fsSLo /usr/local/bin/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${arch}/kubectl"; \
     chmod +x /usr/local/bin/kubectl
 
-COPY tunneld tunnelctl /usr/local/bin/
+COPY --from=build /out/tunneld /out/tunnelctl /usr/local/bin/
 
 RUN mkdir -p /run/tunneld-it /var/lib/tunneld-it/keys /var/lib/tunneld-it/tunnels /tmp/tunneld-it
