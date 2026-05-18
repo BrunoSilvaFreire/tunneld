@@ -1,0 +1,41 @@
+services:
+  node-client:
+    build:
+      context: ../..
+      dockerfile: test/images/tunneld-node/Dockerfile
+    container_name: node-client
+    networks:
+      - tunneld-it
+    volumes:
+      - ../..:/workspace
+      - ../fixtures/ssh:/test/keys:ro
+      - ../.runtime:/runtime
+      - ../.runtime/socket:/run/tunneld-it
+      - ../../artifacts:/artifacts
+    working_dir: /workspace
+    command: ["sleep", "infinity"]
+
+  node-bastion:
+    build:
+      context: ../..
+      dockerfile: test/images/sshd/Dockerfile
+    container_name: node-bastion
+    networks:
+      - tunneld-it
+    volumes:
+      - ../fixtures/ssh:/test/keys:ro
+
+  node-target:
+    build:
+      context: ../..
+      dockerfile: test/images/target/Dockerfile
+    container_name: node-target
+    networks:
+      - tunneld-it
+    expose:
+      - "8080"
+
+networks:
+  tunneld-it:
+    external: true
+    name: tunneld-it

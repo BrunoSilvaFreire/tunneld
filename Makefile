@@ -1,4 +1,4 @@
-.PHONY: all build test clean proto package-deb package-zip setup-local setup-remote build-k8s generate-k8s image-controller image-agent e2e-k8s
+.PHONY: all build test clean proto package-deb package-zip setup-local setup-remote build-k8s generate-k8s image-controller image-agent e2e-k8s integration-up integration-test integration-down integration-diagnostics integration
 
 BINARY_TUNNELD=tunneld
 BINARY_TUNNELCTL=tunnelctl
@@ -47,6 +47,21 @@ image-agent:
 
 e2e-k8s:
 	scripts/e2e/kubernetes.sh
+
+integration-up:
+	./test/scripts/integration-up.sh
+
+integration-test:
+	./test/scripts/integration-test.sh
+
+integration-down:
+	./test/scripts/integration-down.sh
+
+integration-diagnostics:
+	./test/scripts/collect-diagnostics.sh
+
+integration:
+	./test/scripts/integration.sh
 
 test:
 	go test -coverprofile=coverage.out -covermode=atomic ./...

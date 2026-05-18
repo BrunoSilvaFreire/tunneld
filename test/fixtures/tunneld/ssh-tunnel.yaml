@@ -1,0 +1,29 @@
+enabled: true
+type: ssh
+ssh:
+  user: tunneld
+  host: node-bastion
+  port: 22
+  identity_key_file: /test/keys/id_ed25519
+  local_forwards:
+    - listen_address: 127.0.0.1
+      listen_port: 18080
+      target_host: node-target
+      target_port: 8080
+  options:
+    ExitOnForwardFailure: "yes"
+    StrictHostKeyChecking: "no"
+    UserKnownHostsFile: "/dev/null"
+    ServerAliveInterval: "1"
+    ServerAliveCountMax: "2"
+health:
+  type: tcp
+  address: 127.0.0.1:18080
+  interval: 1s
+  timeout: 1s
+  startup_timeout: 20s
+restart:
+  policy: always
+  delay: 1s
+startup_timeout: 20s
+shutdown_timeout: 5s

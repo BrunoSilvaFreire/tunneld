@@ -165,6 +165,47 @@ tunnelctl create my-tunnel --config spec.yaml --persistent
 tunnelctl key add my-key --file ~/.ssh/id_rsa
 ```
 
+## Distributed Integration Tests
+
+The BDD integration suite uses one local or GitHub-hosted runner to orchestrate
+Docker containers and a k3d cluster. It does not require external VMs, private
+networking, secrets, or self-hosted runners.
+
+Prerequisites:
+- Go
+- Docker with Compose v2
+- k3d
+- kubectl
+
+```bash
+make integration-up
+make integration-test
+make integration-diagnostics
+make integration-down
+```
+
+For a full local run with cleanup on failure:
+
+```bash
+make integration
+```
+
+Filter Gherkin scenarios with `GODOG_TAGS`:
+
+```bash
+GODOG_TAGS="@docker && @ssh" make integration-test
+```
+
+During development, use the `ci-lab` remote as the disposable GitHub Actions
+proving ground:
+
+```bash
+git push ci-lab HEAD:refs/heads/integration/my-topic
+```
+
+The integration workflow also runs on `integration/**` branches so iterative
+testing can happen in `ci-lab` before opening a PR against the main repository.
+
 ## Security Model
 
 `tunneld` is designed to run as a system daemon (user `tunneld`).

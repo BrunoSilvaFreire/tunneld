@@ -1,0 +1,52 @@
+tunnels:
+  kube-api-bastion:
+    enabled: true
+    type: ssh
+    ssh:
+      user: tunneld
+      host: node-bastion
+      port: 22
+      identity_key_file: /test/keys/id_ed25519
+      local_forwards:
+        - listen_address: 127.0.0.1
+          listen_port: 16445
+          target_host: k3d-tunneld-it-server-0
+          target_port: 6443
+      options:
+        ExitOnForwardFailure: "yes"
+        StrictHostKeyChecking: "no"
+        UserKnownHostsFile: "/dev/null"
+    health:
+      type: tcp
+      address: 127.0.0.1:16445
+      interval: 1s
+      timeout: 1s
+      startup_timeout: 30s
+    restart:
+      policy: always
+      delay: 1s
+
+  echo-port-forward:
+    enabled: true
+    type: kubectl
+    depends_on:
+      - kube-api-bastion
+    kubectl:
+      kubeconfig_file: /runtime/kubeconfig
+      namespace: default
+      resource: svc/echo
+      api_server: https://127.0.0.1:16445
+      insecure_skip_tls_verify: true
+      forwards:
+        - local_address: 127.0.0.1
+          local_port: 18082
+          remote_port: 8080
+    health:
+      type: tcp
+      address: 127.0.0.1:18082
+      interval: 1s
+      timeout: 1s
+      startup_timeout: 60s
+    restart:
+      policy: always
+      delay: 1s

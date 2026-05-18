@@ -1,0 +1,62 @@
+name: integration
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - main
+      - 'feature/**'
+      - 'integration/**'
+
+permissions:
+  contents: read
+
+jobs:
+  distributed-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run unit tests
+        run: go test ./...
+        env:
+          GONOSUMDB: github.com/BrunoSilvaFreire
+
+      - name: Install k3d
+        run: |
+          # TODO: pin k3d once the project settles on a supported version.
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+          k3d version
+
+      - name: Start integration environment
+        run: make integration-up
+        env:
+          GONOSUMDB: github.com/BrunoSilvaFreire
+
+      - name: Run integration tests
+        run: make integration-test
+        env:
+          GONOSUMDB: github.com/BrunoSilvaFreire
+
+      - name: Collect diagnostics
+        if: always()
+        run: make integration-diagnostics
+
+      - name: Cleanup integration environment
+        if: always()
+        run: make integration-down
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-diagnostics
+          path: artifacts/
+          if-no-files-found: ignore

@@ -1,0 +1,23 @@
+enabled: true
+type: kubectl
+kubectl:
+  kubeconfig_file: /runtime/kubeconfig
+  namespace: default
+  resource: svc/echo
+  api_server: https://k3d-tunneld-it-server-0:6443
+  insecure_skip_tls_verify: true
+  forwards:
+    - local_address: 127.0.0.1
+      local_port: 18081
+      remote_port: 8080
+health:
+  type: tcp
+  address: 127.0.0.1:18081
+  interval: 1s
+  timeout: 1s
+  startup_timeout: 60s
+restart:
+  policy: always
+  delay: 1s
+startup_timeout: 60s
+shutdown_timeout: 5s

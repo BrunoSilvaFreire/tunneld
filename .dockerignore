@@ -1,0 +1,10 @@
+.git
+.idea
+.vscode
+artifacts
+coverage.out
+pkg-build
+*.deb
+*.zip
+test/.runtime
+test/fixtures/ssh/id_ed25519
