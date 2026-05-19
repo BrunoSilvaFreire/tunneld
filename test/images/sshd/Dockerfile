@@ -7,11 +7,24 @@ RUN apk add --no-cache openssh-server && \
     chmod 700 /home/tunneld/.ssh && \
     ssh-keygen -A
 
-RUN sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config && \
-    sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
-    echo "AllowTcpForwarding yes" >> /etc/ssh/sshd_config && \
-    echo "PermitOpen any" >> /etc/ssh/sshd_config && \
-    echo "AllowUsers tunneld" >> /etc/ssh/sshd_config
+RUN printf '%s\n' \
+    'Port 22' \
+    'ListenAddress 0.0.0.0' \
+    'HostKey /etc/ssh/ssh_host_ed25519_key' \
+    'HostKey /etc/ssh/ssh_host_rsa_key' \
+    'PasswordAuthentication no' \
+    'KbdInteractiveAuthentication no' \
+    'PubkeyAuthentication yes' \
+    'AuthorizedKeysFile .ssh/authorized_keys' \
+    'AllowUsers tunneld' \
+    'AllowTcpForwarding yes' \
+    'DisableForwarding no' \
+    'PermitOpen any' \
+    'X11Forwarding no' \
+    'PermitTunnel no' \
+    'UsePAM no' \
+    'LogLevel VERBOSE' \
+    > /etc/ssh/sshd_config
 
 EXPOSE 22
 CMD ["sh", "-c", "cp /test/keys/id_ed25519.pub /home/tunneld/.ssh/authorized_keys && chown -R tunneld:tunneld /home/tunneld/.ssh && chmod 600 /home/tunneld/.ssh/authorized_keys && exec /usr/sbin/sshd -D -e"]
