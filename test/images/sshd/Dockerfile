@@ -9,6 +9,8 @@ RUN apk add --no-cache openssh-server && \
 
 RUN sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config && \
     sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
+    echo "AllowTcpForwarding yes" >> /etc/ssh/sshd_config && \
+    echo "PermitOpen any" >> /etc/ssh/sshd_config && \
     echo "AllowUsers tunneld" >> /etc/ssh/sshd_config
 
 EXPOSE 22
