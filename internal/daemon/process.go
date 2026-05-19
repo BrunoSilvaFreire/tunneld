@@ -246,24 +246,38 @@ func (p *Process) PortMappings() []tunnel.PortMapping {
 // updated to the actual OS-assigned port after dynamic allocation.
 func (p *Process) EffectiveHealthCheck() *pb.HealthCheckSpec {
 	h := p.spec.HealthCheck()
-	if h == nil || h.Address == "" {
-		return h
-	}
-	host, portStr, err := net.SplitHostPort(h.Address)
-	if err != nil || portStr != "0" {
+	if h == nil {
 		return h
 	}
 	p.mu.RLock()
 	mappings := p.portMappings
 	p.mu.RUnlock()
+	if h.Address == "" && h.Type == "tcp" && len(mappings) > 0 {
+		hCopy := proto.Clone(h).(*pb.HealthCheckSpec)
+		hCopy.Address = healthAddressForMapping(mappings[0])
+		return hCopy
+	}
+	host, portStr, err := net.SplitHostPort(h.Address)
+	if err != nil || portStr != "0" {
+		return h
+	}
 	for _, m := range mappings {
 		if m.LocalAddress == host && m.ConfiguredPort == 0 {
 			hCopy := proto.Clone(h).(*pb.HealthCheckSpec)
-			hCopy.Address = net.JoinHostPort(host, strconv.Itoa(int(m.ActualPort)))
+			hCopy.Address = healthAddressForMapping(m)
 			return hCopy
 		}
 	}
 	return h
+}
+
+func healthAddressForMapping(m tunnel.PortMapping) string {
+	host := m.LocalAddress
+	switch host {
+	case "", "0.0.0.0", "::":
+		host = "127.0.0.1"
+	}
+	return net.JoinHostPort(host, strconv.Itoa(int(m.ActualPort)))
 }
 
 func (p *Process) streamLogs(r io.Reader, label string, logger *log.Logger) {

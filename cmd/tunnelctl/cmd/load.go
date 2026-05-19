@@ -25,26 +25,29 @@ var loadCmd = &cobra.Command{
 		configPath := args[0]
 		cfg, err := config.Load(configPath)
 		if err != nil {
-			log.Fatalf("failed to load config: %v", err)
+			FatalError("failed to load config", err)
 		}
 
 		specs, err := cfg.ToSpecs()
 		if err != nil {
-			log.Fatalf("failed to parse specs: %v", err)
+			FatalError("failed to parse specs", err)
 		}
 
 		order, err := dependency.NewPlanner(specs).Plan()
 		if err != nil {
-			log.Fatalf("failed to resolve dependency order: %v", err)
+			FatalError("failed to resolve dependency order", err)
 		}
 
 		hasError := false
+		var results []ActionResponse
 		for _, spec := range order {
 			name := spec.Name()
 			protoSpec := spec.ToProto()
 			inlineKeys, err := slurpKeys(protoSpec)
 			if err != nil {
-				log.Printf("Failed to slurp keys for tunnel %q: %v", name, err)
+				msg := fmt.Sprintf("Failed to slurp keys for tunnel %q: %v", name, err)
+				log.Print(msg)
+				results = append(results, ActionResponse{Status: "error", Message: msg})
 				hasError = true
 				continue
 			}
@@ -55,18 +58,29 @@ var loadCmd = &cobra.Command{
 				Persistent: loadPersistent,
 			})
 			if err != nil {
-				log.Printf("Failed to create tunnel %q: %v", name, err)
+				msg := fmt.Sprintf("Failed to create tunnel %q: %v", name, err)
+				log.Print(msg)
+				results = append(results, ActionResponse{Status: "error", Message: msg})
 				hasError = true
 				continue
 			}
 
 			_, err = client.Start(context.Background(), &pb.StartRequest{Name: name})
 			if err != nil {
-				log.Printf("Failed to start tunnel %q: %v", name, err)
+				msg := fmt.Sprintf("Failed to start tunnel %q: %v", name, err)
+				log.Print(msg)
+				results = append(results, ActionResponse{Status: "error", Message: msg})
 				hasError = true
 				continue
 			}
-			fmt.Printf("Tunnel %q loaded and started (persistent: %v)\n", name, loadPersistent)
+			results = append(results, ActionResponse{Status: "success", Message: fmt.Sprintf("Tunnel %q loaded and started (persistent: %v)", name, loadPersistent)})
+			if outputFormat == "text" || outputFormat == "" {
+				fmt.Printf("Tunnel %q loaded and started (persistent: %v)\n", name, loadPersistent)
+			}
+		}
+
+		if outputFormat != "text" && outputFormat != "" {
+			PrintOutput(results, nil)
 		}
 
 		if hasError {

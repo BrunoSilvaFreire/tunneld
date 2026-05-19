@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
 	"github.com/spf13/cobra"
@@ -21,9 +20,11 @@ var stopCmd = &cobra.Command{
 		name := args[0]
 		_, err := client.Stop(context.Background(), &pb.StopRequest{Name: name})
 		if err != nil {
-			log.Fatalf("could not stop: %v", err)
+			FatalError("could not stop", err)
 		}
-		fmt.Printf("Tunnel %q stop signal sent\n", name)
+		PrintOutput(ActionResponse{Status: "success", Message: fmt.Sprintf("Tunnel %q stop signal sent", name)}, func() {
+			fmt.Printf("Tunnel %q stop signal sent\n", name)
+		})
 	},
 }
 

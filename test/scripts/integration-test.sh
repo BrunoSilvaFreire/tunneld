@@ -14,3 +14,7 @@ export GOCACHE="${GOCACHE:-${ROOT_DIR}/test/.runtime/go-build}"
 mkdir -p "${GOCACHE}"
 
 go test ./test/bdd -v
+
+echo "Generating integration test coverage report..."
+go tool covdata textfmt -i="${ROOT_DIR}/artifacts/coverage" -o="${ROOT_DIR}/artifacts/integration-coverage.out"
+go tool covdata percent -i="${ROOT_DIR}/artifacts/coverage"

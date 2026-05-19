@@ -106,7 +106,7 @@ func (tc *testContext) run(ctx context.Context, timeout time.Duration, name stri
 }
 
 func (tc *testContext) execNode(ctx context.Context, timeout time.Duration, args ...string) (string, error) {
-	all := append([]string{"exec", nodeClient}, args...)
+	all := append([]string{"exec", "-e", "GOCOVERDIR=/artifacts/coverage", nodeClient}, args...)
 	return tc.run(ctx, timeout, "docker", all...)
 }
 
@@ -137,7 +137,7 @@ func (tc *testContext) ensureTunneld(ctx context.Context) error {
 set -eu
 rm -f /run/tunneld-it/tunneld.sock
 mkdir -p /run/tunneld-it /var/lib/tunneld-it/keys /var/lib/tunneld-it/tunnels /tmp/tunneld-it
-nohup tunneld --socket /run/tunneld-it/tunneld.sock --key-dir /var/lib/tunneld-it/keys --tunnels-dir /var/lib/tunneld-it/tunnels run --no-config > /tmp/tunneld-it/tunneld.log 2>&1 &
+nohup env GOCOVERDIR=/artifacts/coverage tunneld --socket /run/tunneld-it/tunneld.sock --key-dir /var/lib/tunneld-it/keys --tunnels-dir /var/lib/tunneld-it/tunnels run --no-config > /tmp/tunneld-it/tunneld.log 2>&1 &
 `)
 	if err != nil {
 		return err
@@ -149,7 +149,7 @@ nohup tunneld --socket /run/tunneld-it/tunneld.sock --key-dir /var/lib/tunneld-i
 }
 
 func (tc *testContext) stopTunneld(ctx context.Context) error {
-	_, err := tc.execNodeShell(ctx, 5*time.Second, "pkill tunneld >/dev/null 2>&1 || true; rm -f /run/tunneld-it/tunneld.sock")
+	_, err := tc.execNodeShell(ctx, 10*time.Second, "pkill tunneld >/dev/null 2>&1 || true; while pgrep tunneld >/dev/null 2>&1; do sleep 0.1; done; rm -f /run/tunneld-it/tunneld.sock")
 	return err
 }
 

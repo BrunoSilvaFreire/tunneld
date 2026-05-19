@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
@@ -25,7 +24,7 @@ var keyAddCmd = &cobra.Command{
 
 		content, err := os.ReadFile(path)
 		if err != nil {
-			log.Fatalf("failed to read key file: %v", err)
+			FatalError("failed to read key file", err)
 		}
 
 		_, conn := getClient()
@@ -37,9 +36,11 @@ var keyAddCmd = &cobra.Command{
 			Content: content,
 		})
 		if err != nil {
-			log.Fatalf("failed to add key: %v", err)
+			FatalError("failed to add key", err)
 		}
-		fmt.Printf("Key %q added successfully\n", name)
+		PrintOutput(ActionResponse{Status: "success", Message: fmt.Sprintf("Key %q added successfully", name)}, func() {
+			fmt.Printf("Key %q added successfully\n", name)
+		})
 	},
 }
 
@@ -53,13 +54,15 @@ var keyListCmd = &cobra.Command{
 		keyClient := pb.NewKeyServiceClient(conn)
 		resp, err := keyClient.ListKeys(context.Background(), &pb.ListKeysRequest{})
 		if err != nil {
-			log.Fatalf("failed to list keys: %v", err)
+			FatalError("failed to list keys", err)
 		}
 
-		fmt.Println("Managed Keys:")
-		for _, name := range resp.Names {
-			fmt.Printf("- %s\n", name)
-		}
+		PrintOutput(resp, func() {
+			fmt.Println("Managed Keys:")
+			for _, name := range resp.Names {
+				fmt.Printf("- %s\n", name)
+			}
+		})
 	},
 }
 
@@ -79,9 +82,11 @@ var keyDeleteCmd = &cobra.Command{
 			Name: name,
 		})
 		if err != nil {
-			log.Fatalf("failed to delete key: %v", err)
+			FatalError("failed to delete key", err)
 		}
-		fmt.Printf("Key %q deleted successfully\n", name)
+		PrintOutput(ActionResponse{Status: "success", Message: fmt.Sprintf("Key %q deleted successfully", name)}, func() {
+			fmt.Printf("Key %q deleted successfully\n", name)
+		})
 	},
 }
 

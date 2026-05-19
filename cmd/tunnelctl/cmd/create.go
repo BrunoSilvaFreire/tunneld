@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/BrunoSilvaFreire/tunneld/internal/config"
@@ -27,27 +26,27 @@ var createCmd = &cobra.Command{
 
 		name := args[0]
 		if createConfigPath == "" {
-			log.Fatal("--config required")
+			FatalError("--config required", nil)
 		}
 
 		data, err := os.ReadFile(createConfigPath)
 		if err != nil {
-			log.Fatalf("failed to read config: %v", err)
+			FatalError("failed to read config", err)
 		}
 
 		var tc config.TunnelConfig
 		if err := yaml.Unmarshal(data, &tc); err != nil {
-			log.Fatalf("failed to parse yaml: %v", err)
+			FatalError("failed to parse yaml", err)
 		}
 
 		protoSpec, err := tc.ToProto(name)
 		if err != nil {
-			log.Fatalf("failed to convert to proto: %v", err)
+			FatalError("failed to convert to proto", err)
 		}
 
 		inlineKeys, err := slurpKeys(protoSpec)
 		if err != nil {
-			log.Fatalf("failed to slurp keys: %v", err)
+			FatalError("failed to slurp keys", err)
 		}
 
 		_, err = client.Create(context.Background(), &pb.CreateRequest{
@@ -56,9 +55,11 @@ var createCmd = &cobra.Command{
 			Persistent: createPersistent,
 		})
 		if err != nil {
-			log.Fatalf("could not create: %v", err)
+			FatalError("could not create", err)
 		}
-		fmt.Printf("Tunnel %q created (persistent: %v)\n", name, createPersistent)
+		PrintOutput(ActionResponse{Status: "success", Message: fmt.Sprintf("Tunnel %q created (persistent: %v)", name, createPersistent)}, func() {
+			fmt.Printf("Tunnel %q created (persistent: %v)\n", name, createPersistent)
+		})
 	},
 }
 

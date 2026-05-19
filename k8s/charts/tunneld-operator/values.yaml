@@ -45,6 +45,10 @@ agent:
   extraNodeSelector: {}
   tolerations:
     - operator: Exists
+  # Supplemental groups for the agent pod. In host-installed mode this may need
+  # to include the container-visible group of the mounted tunneld socket.
+  supplementalGroups:
+    - 118
   hostSocketPath: /run/tunneld     # mode A only
   hostKeyDir: /var/lib/tunneld/keys # mode A only
 

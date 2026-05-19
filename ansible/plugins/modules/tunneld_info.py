@@ -62,6 +62,20 @@ class TunneldInfo(object):
         lines = stdout.strip().splitlines()
         if len(lines) < 2:
             return []
+
+        detailed = {}
+        for line in lines:
+            if ':' not in line:
+                continue
+            key, value = line.split(':', 1)
+            detailed[key.strip().lower()] = value.strip()
+        if detailed.get('tunnel') and detailed.get('status'):
+            return [{
+                'name': detailed['tunnel'],
+                'type': detailed.get('type', ''),
+                'status': detailed['status'],
+                'dependencies': []
+            }]
         
         tunnels = []
         for line in lines[1:]:

@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"os"
 
@@ -16,7 +15,8 @@ import (
 )
 
 var (
-	socketPath string
+	socketPath   string
+	outputFormat string
 )
 
 var rootCmd = &cobra.Command{
@@ -36,7 +36,9 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVar(&socketPath, "socket", constants.DefaultSocketPath, "Path to tunneld gRPC unix socket")
+	rootCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", "text", "Output format (text, json, yaml)")
 	viper.BindPFlag("socket", rootCmd.PersistentFlags().Lookup("socket"))
+	viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output"))
 }
 
 func initConfig() {
@@ -51,7 +53,7 @@ func getClient() (pb.TunnelServiceClient, *grpc.ClientConn) {
 			return net.Dial("unix", s)
 		}))
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		FatalError("did not connect", err)
 	}
 	return pb.NewTunnelServiceClient(conn), conn
 }

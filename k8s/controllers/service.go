@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -45,7 +47,8 @@ func reconcileTunnelService(
 
 	svc := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: t.Namespace}}
 	if _, err := controllerutil.CreateOrUpdate(ctx, c, svc, func() error {
-		svc.Labels = mergeLabels(svc.Labels, managedLabels(t.Name))
+		svc.Labels = mergeLabels(svc.Labels, managedLabels(t))
+		svc.Annotations = mergeLabels(svc.Annotations, managedAnnotations(t.Name))
 		svc.Spec.Type = corev1.ServiceTypeClusterIP
 		svc.Spec.Selector = nil
 		svc.Spec.Ports = []corev1.ServicePort{{
@@ -61,7 +64,8 @@ func reconcileTunnelService(
 
 	ep := &corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: t.Namespace}}
 	if _, err := controllerutil.CreateOrUpdate(ctx, c, ep, func() error {
-		ep.Labels = mergeLabels(ep.Labels, managedLabels(t.Name))
+		ep.Labels = mergeLabels(ep.Labels, managedLabels(t))
+		ep.Annotations = mergeLabels(ep.Annotations, managedAnnotations(t.Name))
 		ep.Subsets = []corev1.EndpointSubset{{
 			Addresses: []corev1.EndpointAddress{{IP: nodeIP}},
 			Ports: []corev1.EndpointPort{{
@@ -106,10 +110,20 @@ func servicePort(t *tunneldv1.Tunnel) int32 {
 	return 0
 }
 
-func managedLabels(tunnelName string) map[string]string {
+func managedLabels(t *tunneldv1.Tunnel) map[string]string {
+	tunnelID := string(t.UID)
+	if tunnelID == "" {
+		tunnelID = shortHash(t.Namespace + "/" + t.Name)
+	}
 	return map[string]string{
 		"app.kubernetes.io/managed-by": "tunneld-controller",
-		"tunneld.io/tunnel":            tunnelName,
+		"tunneld.io/tunnel-uid":        tunnelID,
+	}
+}
+
+func managedAnnotations(tunnelName string) map[string]string {
+	return map[string]string{
+		"tunneld.io/tunnel": tunnelName,
 	}
 }
 
@@ -121,4 +135,9 @@ func mergeLabels(a, b map[string]string) map[string]string {
 		a[k] = v
 	}
 	return a
+}
+
+func shortHash(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:])[:16]
 }

@@ -25,8 +25,14 @@ spec:
       securityContext:
         fsGroup: 65532
         fsGroupChangePolicy: OnRootMismatch
+        {{- with .Values.agent.supplementalGroups }}
+        supplementalGroups: {{ toYaml . | nindent 10 }}
+        {{- end }}
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
+      {{- else if .Values.agent.supplementalGroups }}
+      securityContext:
+        supplementalGroups: {{ toYaml .Values.agent.supplementalGroups | nindent 10 }}
       {{- end }}
       {{- if eq .Values.mode "host-installed" }}
       nodeSelector:

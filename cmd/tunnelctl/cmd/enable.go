@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
 	"github.com/spf13/cobra"
@@ -22,11 +21,14 @@ var enableCmd = &cobra.Command{
 		name := args[0]
 		_, err := client.Enable(context.Background(), &pb.EnableRequest{Name: name})
 		if err != nil {
-			log.Fatalf("could not enable tunnel: %v", err)
+			FatalError("could not enable", err)
 		}
-		fmt.Printf("Tunnel %q enabled and starting\n", name)
-	},
-}
+		PrintOutput(ActionResponse{Status: "success", Message: fmt.Sprintf("Tunnel %q enabled and starting", name)}, func() {
+			fmt.Printf("Tunnel %q enabled and starting\n", name)
+		})
+		},
+		}
+
 
 func init() {
 	rootCmd.AddCommand(enableCmd)

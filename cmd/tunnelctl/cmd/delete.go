@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
 	"github.com/spf13/cobra"
@@ -21,9 +20,11 @@ var deleteCmd = &cobra.Command{
 		name := args[0]
 		_, err := client.Delete(context.Background(), &pb.DeleteRequest{Name: name})
 		if err != nil {
-			log.Fatalf("could not delete: %v", err)
+			FatalError("could not delete", err)
 		}
-		fmt.Printf("Tunnel %q deleted\n", name)
+		PrintOutput(ActionResponse{Status: "success", Message: fmt.Sprintf("Tunnel %q deleted", name)}, func() {
+			fmt.Printf("Tunnel %q deleted\n", name)
+		})
 	},
 }
 

@@ -1,4 +1,4 @@
-.PHONY: all build test clean proto package-deb package-zip setup-local setup-remote build-k8s generate-k8s image-controller image-agent e2e-k8s integration-up integration-test integration-down integration-diagnostics integration
+.PHONY: all build test clean proto package-deb package-zip setup-local setup-remote build-k8s generate-k8s image-k8s image-tunneld image-tunnelctl image-controller image-agent image-tunnelctl-k8s e2e-k8s integration-up integration-test integration-down integration-diagnostics integration
 
 BINARY_TUNNELD=tunneld
 BINARY_TUNNELCTL=tunnelctl
@@ -6,6 +6,12 @@ BINARY_CONTROLLER=tunneld-controller
 BINARY_AGENT=tunneld-agent
 IMAGE_REGISTRY ?= ghcr.io/brunosilvafreire
 IMAGE_TAG ?= latest
+TUNNELD_IMAGE ?= $(IMAGE_REGISTRY)/$(BINARY_TUNNELD)
+TUNNELCTL_IMAGE ?= $(IMAGE_REGISTRY)/tunnelctl
+CONTROLLER_IMAGE ?= $(IMAGE_REGISTRY)/$(BINARY_CONTROLLER)
+AGENT_IMAGE ?= $(IMAGE_REGISTRY)/$(BINARY_AGENT)
+TUNNELD_CONTAINERFILE ?= containers/Containerfile.tunneld
+TUNNELCTL_CONTAINERFILE ?= containers/Containerfile.tunnelctl
 VERSION ?= $(shell scripts/get_version.sh)
 GOARCH ?= $(shell go env GOARCH)
 DEB_PACKAGE=$(BINARY_TUNNELD)_$(VERSION)_$(GOARCH).deb
@@ -39,11 +45,25 @@ generate-k8s:
 		output:crd:artifacts:config=k8s/config/crd \
 		output:rbac:artifacts:config=k8s/config/rbac
 
-image-controller:
-	docker build -f k8s/Dockerfile.controller -t $(IMAGE_REGISTRY)/$(BINARY_CONTROLLER):$(IMAGE_TAG) .
+image-k8s: image-tunneld image-tunnelctl image-controller image-agent
+
+image-tunneld:
+	sudo nerdctl build -t $(TUNNELD_IMAGE):$(IMAGE_TAG) -f $(TUNNELD_CONTAINERFILE) .
+	sudo nerdctl save $(TUNNELD_IMAGE):$(IMAGE_TAG) | sudo ctr --namespace k8s.io images import -
+
+image-tunnelctl:
+	sudo nerdctl build -t $(TUNNELCTL_IMAGE):$(IMAGE_TAG) -f $(TUNNELCTL_CONTAINERFILE) .
+	sudo nerdctl save $(TUNNELCTL_IMAGE):$(IMAGE_TAG) | sudo ctr --namespace k8s.io images import -
 
 image-agent:
-	docker build -f k8s/Dockerfile.agent -t $(IMAGE_REGISTRY)/$(BINARY_AGENT):$(IMAGE_TAG) .
+	sudo nerdctl build -t $(AGENT_IMAGE):$(IMAGE_TAG) -f k8s/Dockerfile.agent .
+	sudo nerdctl save $(AGENT_IMAGE):$(IMAGE_TAG) | sudo ctr --namespace k8s.io images import -
+
+image-controller:
+	sudo nerdctl build -t $(CONTROLLER_IMAGE):$(IMAGE_TAG) -f k8s/Dockerfile.controller .
+	sudo nerdctl save $(CONTROLLER_IMAGE):$(IMAGE_TAG) | sudo ctr --namespace k8s.io images import -
+
+image-tunnelctl-k8s: image-tunnelctl
 
 e2e-k8s:
 	scripts/e2e/kubernetes.sh

@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
@@ -25,46 +24,48 @@ var statusCmd = &cobra.Command{
 		}
 		resp, err := client.Status(context.Background(), &pb.StatusRequest{Name: name})
 		if err != nil {
-			log.Fatalf("could not get status: %v", err)
+			FatalError("could not get status", err)
 		}
 
-		if name != "" && len(resp.Tunnels) == 1 {
-			t := resp.Tunnels[0]
-			fmt.Printf("Tunnel: %s\n", t.Name)
-			fmt.Printf("Status: %s\n", t.Status)
-			if t.Error != "" {
-				fmt.Printf("Error:  %s\n", t.Error)
+		PrintOutput(resp, func() {
+			if name != "" && len(resp.Tunnels) == 1 {
+				t := resp.Tunnels[0]
+				fmt.Printf("Tunnel: %s\n", t.Name)
+				fmt.Printf("Status: %s\n", t.Status)
+				if t.Error != "" {
+					fmt.Printf("Error:  %s\n", t.Error)
+				}
+				fmt.Println("Spec:")
+				m := protojson.MarshalOptions{Multiline: true, Indent: "  "}
+				b, _ := m.Marshal(t.Spec)
+				fmt.Println(string(b))
+				return
 			}
-			fmt.Println("Spec:")
-			m := protojson.MarshalOptions{Multiline: true, Indent: "  "}
-			b, _ := m.Marshal(t.Spec)
-			fmt.Println(string(b))
-			return
-		}
 
-		fmt.Printf("%-20s %-10s %-10s %-25s %-20s %s\n", "NAME", "TYPE", "STATUS", "PORTS", "ERROR", "DEPENDENCIES")
-		for _, t := range resp.Tunnels {
-			typeStr := "unknown"
-			deps := []string{}
-			if t.Spec != nil {
-				deps = t.Spec.DependsOn
-				if t.Spec.GetSsh() != nil {
-					typeStr = "ssh"
-				} else if t.Spec.GetKubectl() != nil {
-					typeStr = "kubectl"
+			fmt.Printf("%-20s %-10s %-10s %-25s %-20s %s\n", "NAME", "TYPE", "STATUS", "PORTS", "ERROR", "DEPENDENCIES")
+			for _, t := range resp.Tunnels {
+				typeStr := "unknown"
+				deps := []string{}
+				if t.Spec != nil {
+					deps = t.Spec.DependsOn
+					if t.Spec.GetSsh() != nil {
+						typeStr = "ssh"
+					} else if t.Spec.GetKubectl() != nil {
+						typeStr = "kubectl"
+					}
 				}
-			}
-			var portParts []string
-			for _, f := range t.ResolvedForwards {
-				part := fmt.Sprintf("%s:%d", f.LocalAddress, f.ActualPort)
-				if f.ConfiguredPort == 0 {
-					part += "*"
+				var portParts []string
+				for _, f := range t.ResolvedForwards {
+					part := fmt.Sprintf("%s:%d", f.LocalAddress, f.ActualPort)
+					if f.ConfiguredPort == 0 {
+						part += "*"
+					}
+					portParts = append(portParts, part)
 				}
-				portParts = append(portParts, part)
+				portsStr := strings.Join(portParts, ",")
+				fmt.Printf("%-20s %-10s %-10s %-25s %-20s %v\n", t.Name, typeStr, t.Status, portsStr, t.Error, deps)
 			}
-			portsStr := strings.Join(portParts, ",")
-			fmt.Printf("%-20s %-10s %-10s %-25s %-20s %v\n", t.Name, typeStr, t.Status, portsStr, t.Error, deps)
-		}
+		})
 	},
 }
 

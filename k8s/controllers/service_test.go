@@ -61,6 +61,12 @@ func TestReconcileTunnelService_CreatesServiceAndEndpoints(t *testing.T) {
 	if svc.Spec.Selector != nil {
 		t.Errorf("expected selector-less Service, got %v", svc.Spec.Selector)
 	}
+	if got := svc.Labels["tunneld.io/tunnel-uid"]; got != "uid-1" {
+		t.Errorf("service tunnel uid label = %q, want uid-1", got)
+	}
+	if got := svc.Annotations["tunneld.io/tunnel"]; got != "pg" {
+		t.Errorf("service tunnel annotation = %q, want pg", got)
+	}
 
 	var ep corev1.Endpoints
 	if err := c.Get(context.Background(), types.NamespacedName{Namespace: "data", Name: "pg"}, &ep); err != nil {
@@ -71,6 +77,42 @@ func TestReconcileTunnelService_CreatesServiceAndEndpoints(t *testing.T) {
 	}
 	if ep.Subsets[0].Ports[0].Port != 34211 {
 		t.Errorf("endpoints port = %d, want 34211", ep.Subsets[0].Ports[0].Port)
+	}
+	if got := ep.Labels["tunneld.io/tunnel-uid"]; got != "uid-1" {
+		t.Errorf("endpoints tunnel uid label = %q, want uid-1", got)
+	}
+	if got := ep.Annotations["tunneld.io/tunnel"]; got != "pg" {
+		t.Errorf("endpoints tunnel annotation = %q, want pg", got)
+	}
+}
+
+func TestReconcileTunnelService_AllowsLongTunnelName(t *testing.T) {
+	s := sceneScheme(t)
+	longName := "tileserver-prerender-svc-services-cityscraper-tileserver-prerender-desktop-hn2j8-k8s-api"
+	tun := &tunneldv1.Tunnel{
+		ObjectMeta: metav1.ObjectMeta{Name: longName, Namespace: "data", UID: "01234567-89ab-cdef-0123-456789abcdef"},
+		Spec: tunneldv1.TunnelSpec{
+			SSH: &tunneldv1.SSHSpec{
+				LocalForwards: []tunneldv1.SSHForward{{TargetPort: 6443}},
+			},
+			Expose: &tunneldv1.ExposeSpec{Service: true, ServiceName: "prod-api"},
+		},
+	}
+	c := fake.NewClientBuilder().WithScheme(s).WithObjects(tun).Build()
+
+	if _, err := reconcileTunnelService(context.Background(), c, s, tun, "10.0.0.5", 34211); err != nil {
+		t.Fatalf("reconcile: %v", err)
+	}
+
+	var svc corev1.Service
+	if err := c.Get(context.Background(), types.NamespacedName{Namespace: "data", Name: "prod-api"}, &svc); err != nil {
+		t.Fatalf("get service: %v", err)
+	}
+	if got := svc.Labels["tunneld.io/tunnel-uid"]; got != "01234567-89ab-cdef-0123-456789abcdef" {
+		t.Errorf("service tunnel uid label = %q", got)
+	}
+	if got := svc.Annotations["tunneld.io/tunnel"]; got != longName {
+		t.Errorf("service tunnel annotation = %q, want %q", got, longName)
 	}
 }
 

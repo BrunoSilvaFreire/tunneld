@@ -25,7 +25,8 @@ for cmd in go docker k3d kubectl ssh-keygen; do
 	require "${cmd}"
 done
 
-mkdir -p test/.runtime/socket test/fixtures/ssh artifacts
+mkdir -p test/.runtime/socket test/fixtures/ssh artifacts/coverage
+rm -rf artifacts/coverage/*
 export GOCACHE="${GOCACHE:-${ROOT_DIR}/test/.runtime/go-build}"
 mkdir -p "${GOCACHE}"
 
@@ -35,8 +36,8 @@ fi
 chmod 600 test/fixtures/ssh/id_ed25519
 chmod 644 test/fixtures/ssh/id_ed25519.pub
 
-go build -o tunneld ./cmd/tunneld/main.go
-go build -o tunnelctl ./cmd/tunnelctl/main.go
+go build -cover -o tunneld ./cmd/tunneld/main.go
+go build -cover -o tunnelctl ./cmd/tunnelctl/main.go
 
 if ! docker network inspect "${NETWORK_NAME}" >/dev/null 2>&1; then
 	docker network create "${NETWORK_NAME}" >/dev/null

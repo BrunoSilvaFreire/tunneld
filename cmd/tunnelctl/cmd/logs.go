@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
 	"github.com/spf13/cobra"
@@ -30,7 +29,7 @@ var logsCmd = &cobra.Command{
 			Follow: follow,
 		})
 		if err != nil {
-			log.Fatalf("could not get logs: %v", err)
+			FatalError("could not get logs", err)
 		}
 
 		for {
@@ -39,9 +38,11 @@ var logsCmd = &cobra.Command{
 				break
 			}
 			if err != nil {
-				log.Fatalf("error receiving logs: %v", err)
+				FatalError("error receiving logs", err)
 			}
-			fmt.Print(resp.Line)
+			PrintOutput(map[string]string{"line": resp.Line}, func() {
+				fmt.Print(resp.Line)
+			})
 		}
 	},
 }

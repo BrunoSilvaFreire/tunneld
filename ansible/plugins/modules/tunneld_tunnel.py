@@ -90,6 +90,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 class TunneldManager(object):
     def __init__(self, module):
+        self.module = module
         self.bin_path = module.params.get('bin_path') or module.get_bin_path('tunnelctl', required=True)
         self.socket_path = module.params.get('socket_path')
 
@@ -112,10 +113,26 @@ class TunneldManager(object):
             if "not found" in stderr.lower() or "not found" in stdout.lower():
                 return None
             self.module.fail_json(msg="Failed to get tunnel status: %s %s" % (stdout, stderr))
-        
-        # Parse status output. Example:
-        # NAME                 TYPE       STATUS     ERROR                DEPENDENCIES
-        # my-ssh-tunnel        ssh        running                         []
+
+        # tunnelctl status <name> prints a detailed format:
+        # Tunnel: my-ssh-tunnel
+        # Status: running
+        detailed = {}
+        for line in stdout.strip().splitlines():
+            if ':' not in line:
+                continue
+            key, value = line.split(':', 1)
+            detailed[key.strip().lower()] = value.strip()
+        if detailed.get('tunnel') and detailed.get('status'):
+            return {
+                'name': detailed['tunnel'],
+                'type': detailed.get('type', ''),
+                'status': detailed['status']
+            }
+
+        # tunnelctl status prints a table format:
+        # NAME                 TYPE       STATUS     PORTS       ERROR     DEPENDENCIES
+        # my-ssh-tunnel        ssh        running    127.0.0.1:1           []
         lines = stdout.strip().splitlines()
         if len(lines) < 2:
             return None
@@ -213,7 +230,7 @@ def main():
         # Refresh status after load
         current_status = manager.get_status(name)
         if not current_status:
-             module.fail_json(msg="Failed to retrieve status for tunnel %q after loading." % name)
+            module.fail_json(msg="Failed to retrieve status for tunnel %q after loading." % name)
     else:
         # TODO: Implement diffing if definition is provided to handle updates
         pass

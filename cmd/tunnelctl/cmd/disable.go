@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 
 	pb "github.com/BrunoSilvaFreire/tunneld/pkg/api/v1"
 	"github.com/spf13/cobra"
@@ -22,11 +21,14 @@ var disableCmd = &cobra.Command{
 		name := args[0]
 		_, err := client.Disable(context.Background(), &pb.DisableRequest{Name: name})
 		if err != nil {
-			log.Fatalf("could not disable tunnel: %v", err)
+			FatalError("could not disable", err)
 		}
-		fmt.Printf("Tunnel %q disabled and stopping\n", name)
-	},
-}
+		PrintOutput(ActionResponse{Status: "success", Message: fmt.Sprintf("Tunnel %q disabled and stopping", name)}, func() {
+			fmt.Printf("Tunnel %q disabled and stopping\n", name)
+		})
+		},
+		}
+
 
 func init() {
 	rootCmd.AddCommand(disableCmd)
