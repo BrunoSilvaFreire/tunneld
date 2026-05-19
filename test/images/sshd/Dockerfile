@@ -2,6 +2,7 @@ FROM alpine:3.20
 
 RUN apk add --no-cache openssh-server && \
     adduser -D -s /bin/sh tunneld && \
+    echo "tunneld:tunneld" | chpasswd && \
     mkdir -p /home/tunneld/.ssh /run/sshd && \
     chmod 700 /home/tunneld/.ssh && \
     ssh-keygen -A
