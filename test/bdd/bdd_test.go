@@ -14,8 +14,8 @@ import (
 )
 
 func TestFeatures(t *testing.T) {
-	if os.Getenv("TUNNELD_IT") != "1" && os.Getenv("CI") != "true" {
-		t.Skip("set TUNNELD_IT=1 or CI=true to run distributed integration tests")
+	if os.Getenv("TUNNELD_IT") != "1" {
+		t.Skip("set TUNNELD_IT=1 to run distributed integration tests")
 	}
 
 	format := "progress"

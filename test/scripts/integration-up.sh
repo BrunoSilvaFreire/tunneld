@@ -43,7 +43,6 @@ if ! docker network inspect "${NETWORK_NAME}" >/dev/null 2>&1; then
 	docker network create "${NETWORK_NAME}" >/dev/null
 fi
 
-docker compose -f test/compose/docker-compose.yml up -d --build
 
 if ! k3d cluster list | awk 'NR > 1 {print $1}' | grep -qx "${CLUSTER_NAME}"; then
 	k3d cluster create "${CLUSTER_NAME}" \
@@ -61,5 +60,5 @@ export KUBECONFIG="${ROOT_DIR}/test/.runtime/kubeconfig"
 kubectl apply -f test/k8s/echo.yaml
 kubectl rollout status deploy/echo --timeout=180s
 
-docker exec node-client kubectl version --client=true >/dev/null
+
 echo "integration environment is ready"

@@ -38,3 +38,4 @@ services:
 networks:
   tunneld-it:
     name: tunneld-it
+    external: true

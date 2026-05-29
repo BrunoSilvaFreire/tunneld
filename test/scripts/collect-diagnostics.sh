@@ -9,7 +9,9 @@ mkdir -p "${OUT}"
 
 docker ps -a > "${OUT}/docker-ps.txt" 2>&1 || true
 docker network inspect tunneld-it > "${OUT}/docker-network-tunneld-it.json" 2>&1 || true
-docker compose -f test/compose/docker-compose.yml logs --no-color > "${OUT}/docker-compose.log" 2>&1 || true
+	docker logs node-client > "${OUT}/docker-node-client.log" 2>&1 || true
+	docker logs node-bastion > "${OUT}/docker-node-bastion.log" 2>&1 || true
+	docker logs node-target > "${OUT}/docker-node-target.log" 2>&1 || true
 docker exec node-client sh -lc 'ls -la /tmp/tunneld-it && cat /tmp/tunneld-it/tunneld.log' > "${OUT}/node-client-tunneld.log" 2>&1 || true
 docker exec node-client tunnelctl --socket /run/tunneld-it/tunneld.sock status > "${OUT}/tunnelctl-status.txt" 2>&1 || true
 k3d cluster list > "${OUT}/k3d-clusters.txt" 2>&1 || true
