@@ -30,6 +30,7 @@ When using this method, reference modules by their **fully qualified collection 
   tunneld.tunneld.tunneld_tunnel:
     name: my-ssh-tunnel
     state: started
+    persistent: true
     definition:
       enabled: true
       type: ssh
@@ -69,6 +70,7 @@ When using manual installation, you can use the short module names:
   tunneld_tunnel:
     name: my-ssh-tunnel
     state: started
+    persistent: true
     definition:
       ...
 ```
@@ -78,12 +80,15 @@ When using manual installation, you can use the short module names:
 ### Managing Tunnels (`tunneld_tunnel`)
 
 The `tunneld_tunnel` module allows declarative management of tunnels.
+Set `persistent: true` when newly loaded tunnels should be saved by `tunneld`
+and survive daemon restarts.
 
 ```yaml
 - name: Ensure an SSH tunnel is running
   tunneld.tunneld.tunneld_tunnel:
     name: my-ssh-tunnel
     state: started
+    persistent: true
     definition:
       enabled: true
       type: ssh

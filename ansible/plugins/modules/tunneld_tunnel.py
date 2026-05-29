@@ -38,6 +38,10 @@ options:
   socket_path:
     description: Path to the tunneld Unix socket.
     type: str
+  persistent:
+    description: Whether newly loaded tunnels should be persisted to disk.
+    type: bool
+    default: no
   wait:
     description: Whether to wait for the tunnel to become healthy before returning.
     type: bool
@@ -55,6 +59,7 @@ EXAMPLES = r'''
   tunneld_tunnel:
     name: my-ssh-tunnel
     state: started
+    persistent: true
     definition:
       enabled: true
       type: ssh
@@ -148,7 +153,7 @@ class TunneldManager(object):
             'status': parts[2]
         }
 
-    def load_tunnel(self, name, definition):
+    def load_tunnel(self, name, definition, persistent=False):
         # tunnelctl load expects a full config file with a 'tunnels' map
         full_config = {
             'tunnels': {
@@ -161,7 +166,10 @@ class TunneldManager(object):
             with os.fdopen(fd, 'w') as f:
                 yaml.dump(full_config, f)
             
-            rc, stdout, stderr = self._run_command_raw(['load', path])
+            args = ['load', path]
+            if persistent:
+                args.append('--persistent')
+            rc, stdout, stderr = self._run_command_raw(args)
             if rc != 0:
                 self.module.fail_json(msg="Failed to load tunnel: %s %s" % (stdout, stderr))
         finally:
@@ -188,6 +196,7 @@ def main():
             definition=dict(type='dict'),
             bin_path=dict(type='str'),
             socket_path=dict(type='str'),
+            persistent=dict(type='bool', default=False),
             wait=dict(type='bool', default=True),
             wait_timeout=dict(type='int', default=30),
         ),
@@ -197,6 +206,7 @@ def main():
     name = module.params['name']
     state = module.params['state']
     definition = module.params['definition']
+    persistent = module.params['persistent']
     wait = module.params['wait']
     wait_timeout = module.params['wait_timeout']
 
@@ -225,7 +235,7 @@ def main():
         if module.check_mode:
             module.exit_json(changed=True)
         
-        manager.load_tunnel(name, definition)
+        manager.load_tunnel(name, definition, persistent=persistent)
         result['changed'] = True
         # Refresh status after load
         current_status = manager.get_status(name)
