@@ -1,4 +1,4 @@
-@docker @ssh @kubernetes @dependency @wip
+@docker @ssh @kubernetes @dependency
 Feature: Tunnel dependency graph
 
   Scenario: kubectl tunnel waits for SSH dependency

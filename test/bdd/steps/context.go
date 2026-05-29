@@ -48,17 +48,17 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^localhost port (\d+) should return "([^"]*)"$`, tc.localhostPortShouldReturn)
 	sc.Step(`^tunnelD should report the Kubernetes tunnel as healthy$`, tc.kubernetesTunnelShouldBeHealthy)
 
-	sc.Step(`^a kubeconfig is available only through an SSH tunnel$`, pendingDependencyWork)
-	sc.Step(`^tunnelD has an SSH tunnel named "([^"]*)"$`, pendingDependencyWork)
-	sc.Step(`^tunnelD has a kubectl tunnel named "([^"]*)"$`, pendingDependencyWork)
-	sc.Step(`^"([^"]*)" depends on "([^"]*)"$`, pendingDependencyWork)
-	sc.Step(`^tunnelD starts the tunnel graph$`, pendingDependencyWork)
-	sc.Step(`^tunnelD should start "([^"]*)" before "([^"]*)"$`, pendingDependencyWork)
-	sc.Step(`^an SSH tunnel through node-bastion is healthy$`, pendingRecoveryWork)
-	sc.Step(`^node-bastion is disconnected from the Docker network$`, pendingRecoveryWork)
-	sc.Step(`^tunnelD should mark the SSH tunnel as unhealthy or degraded$`, pendingRecoveryWork)
-	sc.Step(`^node-bastion is reconnected to the Docker network$`, pendingRecoveryWork)
-	sc.Step(`^tunnelD should eventually mark the SSH tunnel as healthy again$`, pendingRecoveryWork)
+	sc.Step(`^a kubeconfig is available only through an SSH tunnel$`, tc.kubeconfigIsAvailableThroughSSH)
+	sc.Step(`^tunnelD has an SSH tunnel named "([^"]*)"$`, tc.tunnelHasSSHTunnel)
+	sc.Step(`^tunnelD has a kubectl tunnel named "([^"]*)"$`, tc.tunnelHasKubectlTunnel)
+	sc.Step(`^"([^"]*)" depends on "([^"]*)"$`, tc.tunnelDependsOn)
+	sc.Step(`^tunnelD starts the tunnel graph$`, tc.tunnelStartsGraph)
+	sc.Step(`^tunnelD should start "([^"]*)" before "([^"]*)"$`, tc.tunnelShouldStartBefore)
+	sc.Step(`^an SSH tunnel through node-bastion is healthy$`, tc.sshTunnelIsHealthy)
+	sc.Step(`^node-bastion is disconnected from the Docker network$`, tc.nodeBastionIsDisconnected)
+	sc.Step(`^tunnelD should mark the SSH tunnel as unhealthy or degraded$`, tc.sshTunnelIsMarkedUnhealthy)
+	sc.Step(`^node-bastion is reconnected to the Docker network$`, tc.nodeBastionIsReconnected)
+	sc.Step(`^tunnelD should eventually mark the SSH tunnel as healthy again$`, tc.sshTunnelIsHealthyAgain)
 }
 
 func findRoot() string {

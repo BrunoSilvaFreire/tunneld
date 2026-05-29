@@ -1,4 +1,4 @@
-@docker @ssh @recovery @wip
+@docker @ssh @recovery
 Feature: Recovery from node failure
 
   Scenario: tunnelD detects bastion interruption and recovers
