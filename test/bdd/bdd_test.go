@@ -48,6 +48,10 @@ func TestFeatures(t *testing.T) {
 				if err := os.MkdirAll(artifactsDir, 0755); err != nil {
 					log.Fatalf("failed to create artifacts dir: %v", err)
 				}
+				coverageDir := filepath.Join(artifactsDir, "coverage")
+				if err := os.MkdirAll(coverageDir, 0755); err != nil {
+					log.Fatalf("failed to create coverage dir: %v", err)
+				}
 
 				sshKeyDir := filepath.Join(wd, "..", "fixtures", "ssh")
 				if err := os.MkdirAll(sshKeyDir, 0755); err != nil {

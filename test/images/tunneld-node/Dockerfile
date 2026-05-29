@@ -7,8 +7,8 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 go build -o /out/tunneld ./cmd/tunneld/main.go && \
-    CGO_ENABLED=0 go build -o /out/tunnelctl ./cmd/tunnelctl/main.go
+RUN CGO_ENABLED=0 go build -cover -o /out/tunneld ./cmd/tunneld/main.go && \
+    CGO_ENABLED=0 go build -cover -o /out/tunnelctl ./cmd/tunnelctl/main.go
 
 FROM alpine:3.20
 

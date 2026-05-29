@@ -136,7 +136,7 @@ func (tc *testContext) ensureTunneld(ctx context.Context) error {
 	_, err := tc.execNodeShell(ctx, 10*time.Second, `
 set -eu
 rm -f /run/tunneld-it/tunneld.sock
-mkdir -p /run/tunneld-it /var/lib/tunneld-it/keys /var/lib/tunneld-it/tunnels /tmp/tunneld-it
+mkdir -p /run/tunneld-it /var/lib/tunneld-it/keys /var/lib/tunneld-it/tunnels /tmp/tunneld-it /artifacts/coverage
 nohup env GOCOVERDIR=/artifacts/coverage tunneld --socket /run/tunneld-it/tunneld.sock --key-dir /var/lib/tunneld-it/keys --tunnels-dir /var/lib/tunneld-it/tunnels run --no-config > /tmp/tunneld-it/tunneld.log 2>&1 &
 `)
 	if err != nil {
